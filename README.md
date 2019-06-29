@@ -22,11 +22,11 @@ Maven Dependency Setup
 This library builds on top of generic-object-pool, which means support for eager/lazy loading and auto expiring objects.
 
 There are a couple of scenario's you can solve with clustered-object-pool:
-- Have 1 cluster with 1 pool of size 1. Same as using generic-object-pool directly, where you have one resource, but can share/reuse it among threads.
-- Have 1 cluster with 1 pool of size n. Same as using generic-object-pool directly, where multiple resources are shared/reused among threads.
-- Have 1 cluster with n pools of size 1. If you have one cluster with rotating pools to draw a shareable/reusable object from. Usefull when you want to spread load around different servers.
-- Have 1 cluster with n pools of size n. Same as above, except with multiple objects. For example Multiple connections to multiple servers. 
-- Have n clusters .... Same as all the above except you have dedicated clusters for different purposes. For example a cluster for handling internal mails and a cluster for outgoing mails. 
+- Have **1 cluster with 1 pool of size 1**. Same as using generic-object-pool directly, where you have one resource, but can share/reuse it among threads.
+- Have **1 cluster with 1 pool of size n**. Same as using generic-object-pool directly, where multiple resources are shared/reused among threads.
+- Have **1 cluster with n pools of size 1**. If you have one cluster with rotating pools to draw a shareable/reusable object from. Usefull when you want to spread load around different servers.
+- Have **1 cluster with n pools of size n**. Same as above, except with multiple objects. For example Multiple connections to multiple servers. 
+- Have **n clusters ....** Same as all the above except you have dedicated clusters for different purposes. For example a cluster for handling internal mails and a cluster for outgoing mails. 
 
 When creating clusters, you can optionally preregister pools with specific behavior. 
 If you don't pools and clusters and pools are created on the fly with the provided defaults.
