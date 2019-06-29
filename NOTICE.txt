@@ -1,0 +1,11 @@
+  =========================================================================
+  ==  NOTICE file for use with the Apache License, Version 2.0           ==
+  =========================================================================
+  
+  clustered-object-pool, copyright 2019-2020 Benny Bottema
+  
+  This product uses no commercial products.
+  
+  This product uses the following external (Open Source) libraries in the deployed code:
+
+    - generic-object-pool (https://github.com/bbottema/generic-object-pool)

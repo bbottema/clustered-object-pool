@@ -1,0 +1,9 @@
+https://github.com/bbottema/clustered-object-pool
+
+
+RELEASE NOTES clustered-object-pool
+
+
+v1.0.0
+
+- 
