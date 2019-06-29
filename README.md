@@ -31,7 +31,7 @@ There are a couple of scenario's you can solve with clustered-object-pool:
 When creating clusters, you can optionally preregister pools with specific behavior. 
 If you don't pools and clusters and pools are created on the fly with the provided defaults.
 
-#### Basic clusters
+#### Creating clusters
 
 These examples illustrates this library using SMTP clustering connection pools, 
 for which there is actually a dedicated micro library: https://github.com/simple-java-mail/smtp-connection-pool
