@@ -57,7 +57,7 @@
 		<dependency>
 			<groupId>com.github.bbottema</groupId>
 			<artifactId>generic-object-pool</artifactId>
-			<version>1.0.0-SNAPSHOT</version>
+			<version>1.0.0</version>
 			<scope>compile</scope>
 		</dependency>
 
