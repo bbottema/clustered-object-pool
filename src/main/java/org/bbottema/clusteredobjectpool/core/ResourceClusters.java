@@ -66,7 +66,7 @@ public class ResourceClusters<ClusterKey, PoolKey, T> {
 									 @NotNull final ExpirationPolicy<T> expirationPolicy,
 									 final int corePoolSize,
 									 final int maxPoolSize) throws IllegalArgumentException {
-		final ResourcePools<PoolKey, T> cluster = findCluster(key.getClusterKey());
+		final ResourcePools<PoolKey, T> cluster = findOrCreateCluster(key.getClusterKey());
 
 		if (cluster.containsPool(key.getPoolKey())) {
 			throw new IllegalArgumentException("Pool already exists for " + key);
@@ -82,11 +82,11 @@ public class ResourceClusters<ClusterKey, PoolKey, T> {
 	}
 	
 	/**
-	 * Tries to claim the next resources from a pool in the given cluster. If the cluster key is unknown,
-	 * a new cluster is created with one resources pool to draw from.
+	 * Tries to claim the next resources from a pool in the given cluster. This cluster is assumed to have been populated with
+	 * at least one pool already (because they can't be added without pool key).
 	 * <p>
-	 * To use multiple resources pools in a cluster, use {@link #registerResourcePool(ResourceKey)} or
-	 * {@link #registerResourcePool(ResourceKey, ExpirationPolicy, int, int)} instead.
+	 * Either preregister pools using {@link #claimResourceFromPool(ResourceKey)} or dynamically add pools on-the-fly
+	 * using {@link #registerResourcePool(ResourceKey)} or {@link #registerResourcePool(ResourceKey, ExpirationPolicy, int, int)}.
 	 */
 	@Nullable
 	public PoolableObject<T> claimResourceFromCluster(@NotNull final ClusterKey clusterKey) throws InterruptedException {
@@ -100,7 +100,7 @@ public class ResourceClusters<ClusterKey, PoolKey, T> {
 	 */
 	@Nullable
 	public PoolableObject<T> claimResourceFromPool(@NotNull final ResourceKey<ClusterKey, PoolKey> key) throws InterruptedException {
-		final ResourcePools<PoolKey, T> cluster = findCluster(key.getClusterKey());
+		final ResourcePools<PoolKey, T> cluster = findOrCreateCluster(key.getClusterKey());
 		if (!cluster.containsPool(key.getPoolKey())) {
 			registerResourcePool(key);
 		}
@@ -136,7 +136,7 @@ public class ResourceClusters<ClusterKey, PoolKey, T> {
 		}
 	}
 
-	private synchronized ResourcePools<PoolKey, T> findCluster(@NotNull final ClusterKey clusterKey) {
+	private synchronized ResourcePools<PoolKey, T> findOrCreateCluster(@NotNull final ClusterKey clusterKey) {
 		if (!resourceClusters.containsKey(clusterKey)) {
 			Collection<ResourcePool<PoolKey, T>> collectionForCycling = cyclingStrategy.createCollectionForCycling();
 			resourceClusters.put(clusterKey, new ResourcePools<>(collectionForCycling));
@@ -145,7 +145,10 @@ public class ResourceClusters<ClusterKey, PoolKey, T> {
 	}
 
 	private synchronized ResourcePool<PoolKey, T> cycleToNextPool(@NotNull final ClusterKey clusterKey) {
-		ResourcePools<PoolKey, T> cluster = findCluster(clusterKey);
+		ResourcePools<PoolKey, T> cluster = findOrCreateCluster(clusterKey);
+		if (cluster.getClusterCollection().isEmpty()) {
+			throw new IllegalStateException("Cluster contains no pools to draw from");
+		}
 		return cyclingStrategy.cycle(cluster.getClusterCollection());
 	}
 }
