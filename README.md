@@ -19,7 +19,7 @@ Maven Dependency Setup
 
 ## Usage
 
-This library builds on top of generic-object-pool, which means support for eager/lazy loading and auto expiring objects.
+This library builds on top of [generic-object-pool](https://github.com/bbottema/generic-object-pool), which means support for eager/lazy loading and auto expiring objects.
 
 There are a couple of scenario's you can solve with clustered-object-pool:
 - Have **1 cluster with 1 pool of size 1**. Same as using generic-object-pool directly, where you have one resource, but can share/reuse it among threads.
