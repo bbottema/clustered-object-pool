@@ -43,7 +43,7 @@ public class ResourceClusters<ClusterKey, PoolKey, T> {
 	@NotNull private final CyclingStrategy<Collection<ResourcePool<PoolKey, T>>> cyclingStrategy;
 
 	@SuppressWarnings({"unused", "unchecked"})
-	public ResourceClusters(@NotNull final ClusterConfig<PoolKey, T> clusterConfig) {
+	public ResourceClusters(final ClusterConfig<PoolKey, T> clusterConfig) {
 		this.clusterConfig = clusterConfig;
 		this.cyclingStrategy = clusterConfig.getCyclingStrategy();
 	}
@@ -52,7 +52,7 @@ public class ResourceClusters<ClusterKey, PoolKey, T> {
 	 * Delegates to {@link #registerResourcePool(ResourceKey, ExpirationPolicy, int, int)}, using the global defaults for expiration policy, max pool size and sizing mode.
 	 */
 	@SuppressWarnings("unused")
-	public void registerResourcePool(@NotNull ResourceKey<ClusterKey, PoolKey> key) {
+	public void registerResourcePool(ResourceKey<ClusterKey, PoolKey> key) {
 		registerResourcePool(key, clusterConfig.getDefaultExpirationPolicy(), clusterConfig.getDefaultCorePoolSize(), clusterConfig.getDefaultMaxPoolSize());
 	}
 	
@@ -89,7 +89,7 @@ public class ResourceClusters<ClusterKey, PoolKey, T> {
 	 * using {@link #registerResourcePool(ResourceKey)} or {@link #registerResourcePool(ResourceKey, ExpirationPolicy, int, int)}.
 	 */
 	@Nullable
-	public PoolableObject<T> claimResourceFromCluster(@NotNull final ClusterKey clusterKey) throws InterruptedException {
+	public PoolableObject<T> claimResourceFromCluster(final ClusterKey clusterKey) throws InterruptedException {
 		return cycleToNextPool(clusterKey).claim(clusterConfig.getClaimTimeout());
 	}
 	
@@ -99,7 +99,7 @@ public class ResourceClusters<ClusterKey, PoolKey, T> {
 	 * to draw from is created for that key.
 	 */
 	@Nullable
-	public PoolableObject<T> claimResourceFromPool(@NotNull final ResourceKey<ClusterKey, PoolKey> key) throws InterruptedException {
+	public PoolableObject<T> claimResourceFromPool(final ResourceKey<ClusterKey, PoolKey> key) throws InterruptedException {
 		final ResourcePools<PoolKey, T> cluster = findOrCreateCluster(key.getClusterKey());
 		if (!cluster.containsPool(key.getPoolKey())) {
 			registerResourcePool(key);
@@ -136,7 +136,7 @@ public class ResourceClusters<ClusterKey, PoolKey, T> {
 		}
 	}
 
-	private synchronized ResourcePools<PoolKey, T> findOrCreateCluster(@NotNull final ClusterKey clusterKey) {
+	private synchronized ResourcePools<PoolKey, T> findOrCreateCluster(final ClusterKey clusterKey) {
 		if (!resourceClusters.containsKey(clusterKey)) {
 			Collection<ResourcePool<PoolKey, T>> collectionForCycling = cyclingStrategy.createCollectionForCycling();
 			resourceClusters.put(clusterKey, new ResourcePools<>(collectionForCycling));
@@ -144,7 +144,7 @@ public class ResourceClusters<ClusterKey, PoolKey, T> {
 		return resourceClusters.get(clusterKey);
 	}
 
-	private synchronized ResourcePool<PoolKey, T> cycleToNextPool(@NotNull final ClusterKey clusterKey) {
+	private synchronized ResourcePool<PoolKey, T> cycleToNextPool(final ClusterKey clusterKey) {
 		ResourcePools<PoolKey, T> cluster = findOrCreateCluster(clusterKey);
 		if (cluster.getClusterCollection().isEmpty()) {
 			throw new IllegalStateException("Cluster contains no pools to draw from");
