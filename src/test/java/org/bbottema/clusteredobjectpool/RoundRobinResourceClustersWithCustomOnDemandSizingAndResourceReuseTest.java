@@ -25,7 +25,7 @@ public class RoundRobinResourceClustersWithCustomOnDemandSizingAndResourceReuseT
 	@Override
 	public TestableDummyClustersOnDemandSizing createTestableClusters() {
 		ExpirationPolicy<String> expireAlmostImmediately = new TimeoutSinceCreationExpirationPolicy<>(QUICK_EXPIRY_TIMEOUT_MS, MILLISECONDS);
-		return new TestableDummyClustersOnDemandSizing(new DummyAllocatorFactory(), expireAlmostImmediately, MAX_POOL_SIZE);
+		return new TestableDummyClustersOnDemandSizing(new DummyAllocatorFactory(), expireAlmostImmediately);
 	}
 	
 	@Test

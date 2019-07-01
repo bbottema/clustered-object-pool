@@ -10,13 +10,12 @@ import java.util.UUID;
 
 class TestableDummyClustersOnDemandSizing extends ResourceClusters<UUID, String, String> {
     TestableDummyClustersOnDemandSizing(@NotNull final AllocatorFactory<String, String> allocatorFactory,
-                                        @NotNull final ExpirationPolicy<String> defaultExpiration,
-                                        int defaultMaxPoolSize) {
+                                        @NotNull final ExpirationPolicy<String> defaultExpiration) {
         super(ClusterConfig.<String, String>builder()
                 .allocatorFactory(allocatorFactory)
                 .defaultExpirationPolicy(defaultExpiration)
                 .defaultCorePoolSize(0)
-                .defaultMaxPoolSize(defaultMaxPoolSize)
+                .defaultMaxPoolSize(4)
                 .build());
     }
 }

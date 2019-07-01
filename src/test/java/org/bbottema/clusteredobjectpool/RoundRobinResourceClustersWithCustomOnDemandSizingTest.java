@@ -22,7 +22,7 @@ public class RoundRobinResourceClustersWithCustomOnDemandSizingTest extends Roun
 	
 	public TestableDummyClustersOnDemandSizing createTestableClusters() {
 		ExpirationPolicy<String> expireAfter10Seconds = new TimeoutSinceCreationExpirationPolicy<>(10, SECONDS);
-		return new TestableDummyClustersOnDemandSizing(new DummyAllocatorFactory(), expireAfter10Seconds, MAX_POOL_SIZE);
+		return new TestableDummyClustersOnDemandSizing(new DummyAllocatorFactory(), expireAfter10Seconds);
 	}
 	
 	@Test

@@ -20,8 +20,6 @@ import static java.util.Objects.requireNonNull;
 
 public abstract class RoundRobinResourceClustersTestBase {
 	
-	static final int MAX_POOL_SIZE = 4;
-	
 	ResourceClusters<UUID, String, String> clusters;
 	List<PoolableObject<String>> claimedResources;
 	
@@ -77,7 +75,7 @@ public abstract class RoundRobinResourceClustersTestBase {
 				}
 				
 				@Override
-				public void deallocate(@NotNull String object) {
+				public void deallocate(String object) {
 					LOGGER.debug("deallocating " + object);
 				}
 			};

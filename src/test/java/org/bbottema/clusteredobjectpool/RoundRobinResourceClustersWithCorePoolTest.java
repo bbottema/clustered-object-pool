@@ -22,7 +22,7 @@ public class RoundRobinResourceClustersWithCorePoolTest extends RoundRobinResour
 	
 	public TestableDummyClustersDefaultAutoSizing createTestableClusters() {
 		final ExpirationPolicy<String> defaultExpiration = new TimeoutSinceCreationExpirationPolicy<>(10, SECONDS);
-		return new TestableDummyClustersDefaultAutoSizing(new DummyAllocatorFactory(), defaultExpiration, MAX_POOL_SIZE);
+		return new TestableDummyClustersDefaultAutoSizing(new DummyAllocatorFactory(), defaultExpiration);
 	}
 	
 	@Test
