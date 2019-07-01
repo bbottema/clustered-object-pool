@@ -15,7 +15,7 @@ Maven Dependency Setup
 <dependency>
 	<groupId>com.github.bbottema</groupId>
 	<artifactId>clustered-object-pool</artifactId>
-	<version>1.0.3</version>
+	<version>x.y.z</version>
 </dependency>
 ```
 
