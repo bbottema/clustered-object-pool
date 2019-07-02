@@ -11,18 +11,17 @@ import java.util.concurrent.ThreadLocalRandom;
  * Randomly (thread-safe) cycles through the given items.
  */
 @SuppressWarnings("unused")
-public class RandomAccessLoadBalancing implements LoadBalancingStrategy<List> {
+public class RandomAccessLoadBalancing<T> implements LoadBalancingStrategy<T, List<T>> {
 	
 	@NotNull
 	@Override
-	public List createCollectionForCycling() {
+	public List<T> createCollectionForCycling() {
 		return new LinkedList<>();
 	}
 	
 	@NotNull
 	@Override
-	public <T> T cycle(@NotNull List items) {
-		@SuppressWarnings({"unchecked"}) List<T> itemsTyped = items;
-		return itemsTyped.get(ThreadLocalRandom.current().nextInt(items.size()) % items.size());
+	public T cycle(@NotNull List<T> items) {
+		return items.get(ThreadLocalRandom.current().nextInt(items.size()) % items.size());
 	}
 }

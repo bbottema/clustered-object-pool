@@ -55,7 +55,7 @@ public class ResourceClusters<ClusterKey, PoolKey, T> {
 
 	@NotNull private final Map<ClusterKey, ResourcePools<PoolKey, T>> resourceClusters = new HashMap<>();
 	@NotNull private final ClusterConfig<PoolKey, T> clusterConfig;
-	@NotNull private final LoadBalancingStrategy<Collection<ResourcePool<PoolKey, T>>> loadBalancingStrategy;
+	@NotNull private final LoadBalancingStrategy<ResourcePool<PoolKey, T>, Collection<ResourcePool<PoolKey, T>>> loadBalancingStrategy;
 
 	@SuppressWarnings({"unused", "unchecked"})
 	public ResourceClusters(final ClusterConfig<PoolKey, T> clusterConfig) {

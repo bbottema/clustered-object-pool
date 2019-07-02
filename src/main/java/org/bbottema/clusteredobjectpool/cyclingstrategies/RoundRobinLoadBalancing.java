@@ -10,20 +10,19 @@ import java.util.Queue;
  * Evenly cycles through the given items.
  */
 @SuppressWarnings("unused")
-public class RoundRobinLoadBalancing implements LoadBalancingStrategy<Queue> {
+public class RoundRobinLoadBalancing<T> implements LoadBalancingStrategy<T, Queue<T>> {
 	
 	@NotNull
 	@Override
-	public Queue createCollectionForCycling() {
+	public Queue<T> createCollectionForCycling() {
 		return new LinkedList<>();
 	}
 	
 	@NotNull
 	@Override
-	public <T> T cycle(@NotNull Queue items) {
-		@SuppressWarnings("unchecked") Queue<T> itemsType = items;
-		T nextItem = itemsType.remove();
-		itemsType.add(nextItem);
+	public T cycle(@NotNull Queue<T> items) {
+		T nextItem = items.remove();
+		items.add(nextItem);
 		return nextItem;
 	}
 }
