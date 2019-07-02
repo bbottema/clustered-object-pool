@@ -57,10 +57,6 @@ PoolableObject<Transport> resource = clusters.claimResourceFromPool(new Resource
 // above cluster and pools are created on the fly
 ```
 
-The following cycling strategies are provided by default:
-- RoundRobinCyclingStrategy
-- RandomAccessCyclingStrategy
-
 #### Customizing pools
 
 ```java
@@ -128,4 +124,35 @@ class TransportAllocator extends Allocator<Transport> {
 }
 ```
 Now each time a specific pool created -either by claiming for it or pre-registering-, this factory is invoked
-with the respective pool key (the Session instance representing the server). 
+with the respective pool key (the Session instance representing the server).
+
+#### Load balancing strategies
+
+By default, load is balanced round robin, but you can easily use a different strategy. For example, to use the provided random balancer instead:
+
+```java
+ClusterConfig<Session, Transport> clusterConfig = ClusterConfig.<Session, Transport>builder()
+    .loadBalancingStrategy(new RandomAccessLoadBalancing())
+    .(..)
+    .build();
+```
+
+The following balancing strategies are provided by default:
+- RoundRobinCyclingStrategy
+- RandomAccessLoadBalancing
+
+You can create your own load balancer as well. For example to define a load balancer that routes 50% of the traffic to server A and the other 50% to the rest of the servers, here's one way 
+to implement this:
+
+```java
+// load balancer that routes 50% of the traffic to the primary (first) server
+public class PrimaryServerLoadBalancing<T> implements LoadBalancingStrategy<T, List<T>> {
+	
+	public List<T> createCollectionForCycling() { return new ArrayList<>(); }
+	
+	public T cycle(@NotNull List<T> items) {
+		final Random rng = ThreadLocalRandom.current();
+		items.get((rng.nextInt(100) < 50) ? 0 : 1 + rng.nextInt(items.size() - 1));
+	}
+}
+```
