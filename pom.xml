@@ -311,9 +311,18 @@
 						<java>SLASHSTAR_STYLE</java>
 					</mapping>
 					<includes>
-						<include>**/*.java</include>
+						<include>src/main/java/**/*.java</include>
 					</includes>
 				</configuration>
+				<executions>
+					<execution>
+						<id>compile-format</id>
+						<phase>compile</phase>
+						<goals>
+							<goal>format</goal>
+						</goals>
+					</execution>
+				</executions>
 			</plugin>
 		</plugins>
 	</build>
