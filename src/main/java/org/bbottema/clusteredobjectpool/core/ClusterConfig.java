@@ -21,8 +21,8 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Value;
 import org.bbottema.clusteredobjectpool.core.api.AllocatorFactory;
-import org.bbottema.clusteredobjectpool.core.api.CyclingStrategy;
-import org.bbottema.clusteredobjectpool.cyclingstrategies.RoundRobinCyclingStrategy;
+import org.bbottema.clusteredobjectpool.core.api.LoadBalancingStrategy;
+import org.bbottema.clusteredobjectpool.cyclingstrategies.RoundRobinLoadBalancing;
 import org.bbottema.genericobjectpool.ExpirationPolicy;
 import org.bbottema.genericobjectpool.util.ForeverTimeout;
 import org.bbottema.genericobjectpool.util.Timeout;
@@ -67,8 +67,8 @@ public class ClusterConfig<PoolKey, T> {
     @NotNull private final Timeout claimTimeout = ForeverTimeout.WAIT_FOREVER;
     /**
      *  Strategy for choosing which resource pool (for example connections to a specific server) in a cluster (of servers) to utilize.
-     *  Defaults to {@link RoundRobinCyclingStrategy}.
+     *  Defaults to {@link RoundRobinLoadBalancing}.
      */
     @Builder.Default
-    @NotNull private final CyclingStrategy cyclingStrategy = new RoundRobinCyclingStrategy();
+    @NotNull private final LoadBalancingStrategy cyclingStrategy = new RoundRobinLoadBalancing();
 }

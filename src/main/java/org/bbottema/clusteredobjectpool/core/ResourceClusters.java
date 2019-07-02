@@ -15,7 +15,7 @@
  */
 package org.bbottema.clusteredobjectpool.core;
 
-import org.bbottema.clusteredobjectpool.core.api.CyclingStrategy;
+import org.bbottema.clusteredobjectpool.core.api.LoadBalancingStrategy;
 import org.bbottema.clusteredobjectpool.core.api.ResourceKey;
 import org.bbottema.genericobjectpool.ExpirationPolicy;
 import org.bbottema.genericobjectpool.GenericObjectPool;
@@ -55,12 +55,12 @@ public class ResourceClusters<ClusterKey, PoolKey, T> {
 
 	@NotNull private final Map<ClusterKey, ResourcePools<PoolKey, T>> resourceClusters = new HashMap<>();
 	@NotNull private final ClusterConfig<PoolKey, T> clusterConfig;
-	@NotNull private final CyclingStrategy<Collection<ResourcePool<PoolKey, T>>> cyclingStrategy;
+	@NotNull private final LoadBalancingStrategy<Collection<ResourcePool<PoolKey, T>>> loadBalancingStrategy;
 
 	@SuppressWarnings({"unused", "unchecked"})
 	public ResourceClusters(final ClusterConfig<PoolKey, T> clusterConfig) {
 		this.clusterConfig = clusterConfig;
-		this.cyclingStrategy = clusterConfig.getCyclingStrategy();
+		this.loadBalancingStrategy = clusterConfig.getCyclingStrategy();
 	}
 	
 	/**
@@ -153,7 +153,7 @@ public class ResourceClusters<ClusterKey, PoolKey, T> {
 
 	private synchronized ResourcePools<PoolKey, T> findOrCreateCluster(final ClusterKey clusterKey) {
 		if (!resourceClusters.containsKey(clusterKey)) {
-			Collection<ResourcePool<PoolKey, T>> collectionForCycling = cyclingStrategy.createCollectionForCycling();
+			Collection<ResourcePool<PoolKey, T>> collectionForCycling = loadBalancingStrategy.createCollectionForCycling();
 			resourceClusters.put(clusterKey, new ResourcePools<>(collectionForCycling));
 		}
 		return resourceClusters.get(clusterKey);
@@ -164,6 +164,6 @@ public class ResourceClusters<ClusterKey, PoolKey, T> {
 		if (cluster.getClusterCollection().isEmpty()) {
 			throw new IllegalStateException("Cluster contains no pools to draw from");
 		}
-		return cyclingStrategy.cycle(cluster.getClusterCollection());
+		return loadBalancingStrategy.cycle(cluster.getClusterCollection());
 	}
 }
