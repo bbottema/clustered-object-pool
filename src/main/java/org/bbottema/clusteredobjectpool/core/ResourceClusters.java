@@ -60,7 +60,7 @@ public class ResourceClusters<ClusterKey, PoolKey, T> {
 	@SuppressWarnings({"unused", "unchecked"})
 	public ResourceClusters(final ClusterConfig<PoolKey, T> clusterConfig) {
 		this.clusterConfig = clusterConfig;
-		this.loadBalancingStrategy = clusterConfig.getCyclingStrategy();
+		this.loadBalancingStrategy = clusterConfig.getLoadBalancingStrategy();
 	}
 	
 	/**

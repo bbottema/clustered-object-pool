@@ -70,5 +70,5 @@ public class ClusterConfig<PoolKey, T> {
      *  Defaults to {@link RoundRobinLoadBalancing}.
      */
     @Builder.Default
-    @NotNull private final LoadBalancingStrategy cyclingStrategy = new RoundRobinLoadBalancing();
+    @NotNull private final LoadBalancingStrategy loadBalancingStrategy = new RoundRobinLoadBalancing();
 }
