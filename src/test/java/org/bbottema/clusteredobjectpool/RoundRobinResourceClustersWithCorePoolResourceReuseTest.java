@@ -82,7 +82,7 @@ public class RoundRobinResourceClustersWithCorePoolResourceReuseTest extends Rou
 		// all allocated resources
 		assertThat(clusters.countLiveResources()).isEqualTo(20);
 		
-		clusters.clearPools();
+		clusters.shutDown();
 		MILLISECONDS.sleep(50);
 		
 		// allocated resources after clearing released resources

@@ -85,7 +85,7 @@ public class RoundRobinResourceClustersWithCorePoolTest extends RoundRobinResour
 		MILLISECONDS.sleep(50);
 		assertThat(clusters.countLiveResources()).isEqualTo(20);
 		
-		clusters.clearPools();
+		clusters.shutDown();
 		MILLISECONDS.sleep(50);
 		
 		// allocated resources after clearing released resources

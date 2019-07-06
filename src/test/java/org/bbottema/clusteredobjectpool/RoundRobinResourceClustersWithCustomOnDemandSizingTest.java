@@ -78,7 +78,7 @@ public class RoundRobinResourceClustersWithCustomOnDemandSizingTest extends Roun
 		// all allocated resources
 		assertThat(clusters.countLiveResources()).isEqualTo(15);
 		
-		clusters.clearPools();
+		clusters.shutDown();
 		MILLISECONDS.sleep(50);
 		
 		// allocated resources after clearing released resources

@@ -17,6 +17,7 @@ package org.bbottema.clusteredobjectpool.core;
 
 import org.bbottema.clusteredobjectpool.core.api.LoadBalancingStrategy;
 import org.bbottema.clusteredobjectpool.core.api.ResourceKey;
+import org.bbottema.clusteredobjectpool.util.CompositeFuture;
 import org.bbottema.genericobjectpool.ExpirationPolicy;
 import org.bbottema.genericobjectpool.GenericObjectPool;
 import org.bbottema.genericobjectpool.PoolConfig;
@@ -24,9 +25,12 @@ import org.bbottema.genericobjectpool.PoolableObject;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.concurrent.Future;
 
 /**
  * Collection of clusters, each containing a number of (generic-object-pool) resource pools. Relies on the native generic-object-pool behavior for
@@ -134,10 +138,10 @@ public class ResourceClusters<ClusterKey, PoolKey, T> {
 	}
 	
 	/**
-	 * Delegates to {@link #clearPool(Object)} with empty pool key.
+	 * Delegates to {@link #shutdownPool(Object)} with empty pool key.
 	 */
-	public synchronized void clearPools() {
-		clearPool(null);
+	public synchronized Future<?> shutDown() {
+		return shutdownPool(null);
 	}
 	
 	/**
@@ -145,10 +149,12 @@ public class ResourceClusters<ClusterKey, PoolKey, T> {
 	 * After calling this, the cluster is ready for more work as if it was just created.
 	 */
 	@SuppressWarnings("WeakerAccess")
-	public synchronized void clearPool(@Nullable final PoolKey key) {
+	public synchronized Future<?> shutdownPool(@Nullable final PoolKey key) {
+		final List<Future> poolsShuttingDown = new ArrayList<>();
 		for (final ResourcePools<PoolKey, T> resourcePools : resourceClusters.values()) {
-			resourcePools.clearPool(key);
+			poolsShuttingDown.add(resourcePools.shutdownPool(key));
 		}
+		return new CompositeFuture(poolsShuttingDown);
 	}
 
 	private synchronized ResourcePools<PoolKey, T> findOrCreateCluster(final ClusterKey clusterKey) {

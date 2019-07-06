@@ -24,6 +24,8 @@ import org.bbottema.genericobjectpool.util.Timeout;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
+import java.util.concurrent.Future;
+
 /**
  * Serves to keep track of the poolKey associated with the generic-object-pool pool.
  */
@@ -33,8 +35,8 @@ class ResourcePool<PoolKey, T> {
 	final PoolKey poolKey;
 	final GenericObjectPool<T> pool;
 	
-	void clearPool() {
-		pool.shutdown();
+	Future<?> clearPool() {
+		return pool.shutdown();
 	}
 	
 	@Nullable

@@ -93,7 +93,7 @@ public class RoundRobinResourceClustersWithCustomOnDemandSizingAndResourceReuseT
 		MILLISECONDS.sleep(SLEEP_TIMEOUT_AFTER_CLAIMING_MS);
 		assertThat(clusters.countLiveResources()).isEqualTo(0);
 		
-		clusters.clearPools();
+		clusters.shutDown();
 		MILLISECONDS.sleep(50);
 		// allocated resources after clearing all resources
 		assertThat(clusters.countLiveResources()).isEqualTo(0);

@@ -19,11 +19,19 @@ import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import lombok.ToString;
+import org.bbottema.clusteredobjectpool.util.CompositeFuture;
 import org.bbottema.genericobjectpool.PoolableObject;
 import org.bbottema.genericobjectpool.util.Timeout;
 import org.jetbrains.annotations.Nullable;
 
+import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Iterator;
+import java.util.List;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.FutureTask;
 
 /**
  * Serves to hide some methods that iterate over a cluster of pools.
@@ -34,12 +42,15 @@ class ResourcePools<PoolKey, T> {
 	@Getter(AccessLevel.PACKAGE)
 	private final Collection<ResourcePool<PoolKey, T>> clusterCollection;
 	
-	void clearPool(@Nullable PoolKey key) {
+	@SuppressWarnings("UnusedReturnValue")
+	FutureTask<?> shutdownPool(@Nullable PoolKey key) {
+		final List<Future> poolsShuttingDown = new ArrayList<>();
 		for (final ResourcePool<PoolKey, T> poolInCluster : clusterCollection) {
 			if (key == null || poolInCluster.getPoolKey().equals(key)) {
-				poolInCluster.clearPool();
+				poolsShuttingDown.add(poolInCluster.clearPool());
 			}
 		}
+		return new CompositeFuture(poolsShuttingDown);
 	}
 	
 	boolean containsPool(PoolKey poolKey) {
@@ -76,4 +87,5 @@ class ResourcePools<PoolKey, T> {
 		}
 		return total;
 	}
+	
 }
