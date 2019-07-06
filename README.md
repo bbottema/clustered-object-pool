@@ -156,3 +156,10 @@ public class PrimaryServerLoadBalancing<T> implements LoadBalancingStrategy<T, L
 	}
 }
 ```
+
+## Shutting down
+
+Future<?> shutdownFuture = clusters.shutDown();
+Future<?> shutdownFuture = clusters.shutDown(PoolKey);
+
+shutdownFuture.get(); // blocks until all relevant pools have shut down
