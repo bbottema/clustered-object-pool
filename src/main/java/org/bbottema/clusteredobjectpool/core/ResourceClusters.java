@@ -101,6 +101,14 @@ public class ResourceClusters<ClusterKey, PoolKey, T> {
 	}
 	
 	/**
+	 * @return If a cluster and pool combination is registered as a known pool.
+	 */
+	public boolean isPoolRegistered(@NotNull final ResourceKey<ClusterKey, PoolKey> key) {
+		return resourceClusters.containsKey(key.getClusterKey()) &&
+				resourceClusters.get(key.getClusterKey()).containsPool(key.getPoolKey());
+	}
+	
+	/**
 	 * Tries to claim the next resources from a pool in the given cluster. This cluster is assumed to have been populated with
 	 * at least one pool already (because they can't be added without pool key).
 	 * <p>
