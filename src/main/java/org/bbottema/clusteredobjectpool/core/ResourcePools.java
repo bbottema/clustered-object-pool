@@ -28,8 +28,6 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Iterator;
 import java.util.List;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.FutureTask;
 
@@ -41,16 +39,20 @@ import java.util.concurrent.FutureTask;
 class ResourcePools<PoolKey, T> {
 	@Getter(AccessLevel.PACKAGE)
 	private final Collection<ResourcePool<PoolKey, T>> clusterCollection;
+	private final Collection<ResourcePool<PoolKey, T>> poolsShuttingDown = new ArrayList<>();
 	
 	@SuppressWarnings("UnusedReturnValue")
 	FutureTask<?> shutdownPool(@Nullable PoolKey key) {
-		final List<Future> poolsShuttingDown = new ArrayList<>();
-		for (final ResourcePool<PoolKey, T> poolInCluster : clusterCollection) {
+		final List<Future> poolsShuttingDownFuture = new ArrayList<>();
+		for (Iterator<ResourcePool<PoolKey, T>> iterator = clusterCollection.iterator(); iterator.hasNext(); ) {
+			ResourcePool<PoolKey, T> poolInCluster = iterator.next();
 			if (key == null || poolInCluster.getPoolKey().equals(key)) {
-				poolsShuttingDown.add(poolInCluster.clearPool());
+				poolsShuttingDownFuture.add(poolInCluster.clearPool());
+				poolsShuttingDown.add(poolInCluster);
+				iterator.remove();
 			}
 		}
-		return new CompositeFuture(poolsShuttingDown);
+		return new CompositeFuture(poolsShuttingDownFuture);
 	}
 	
 	boolean containsPool(PoolKey poolKey) {
@@ -83,6 +85,9 @@ class ResourcePools<PoolKey, T> {
 	int currentlyAllocated() {
 		int total = 0;
 		for (ResourcePool<PoolKey, T> resourcePool : clusterCollection) {
+			total += resourcePool.getPoolMetrics().getCurrentlyAllocated();
+		}
+		for (ResourcePool<PoolKey, T> resourcePool : poolsShuttingDown) {
 			total += resourcePool.getPoolMetrics().getCurrentlyAllocated();
 		}
 		return total;
