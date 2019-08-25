@@ -15,6 +15,7 @@
  */
 package org.bbottema.clusteredobjectpool.core;
 
+import lombok.Getter;
 import org.bbottema.clusteredobjectpool.core.api.LoadBalancingStrategy;
 import org.bbottema.clusteredobjectpool.core.api.ResourceKey;
 import org.bbottema.clusteredobjectpool.util.CompositeFuture;
@@ -58,6 +59,7 @@ import java.util.concurrent.Future;
 public class ResourceClusters<ClusterKey, PoolKey, T> {
 
 	@NotNull private final Map<ClusterKey, ResourcePools<PoolKey, T>> resourceClusters = new HashMap<>();
+	@Getter
 	@NotNull private final ClusterConfig<PoolKey, T> clusterConfig;
 	@NotNull private final LoadBalancingStrategy<ResourcePool<PoolKey, T>, Collection<ResourcePool<PoolKey, T>>> loadBalancingStrategy;
 
@@ -148,6 +150,7 @@ public class ResourceClusters<ClusterKey, PoolKey, T> {
 	/**
 	 * Delegates to {@link #shutdownPool(Object)} with empty pool key.
 	 */
+	@SuppressWarnings("UnusedReturnValue")
 	public synchronized Future<?> shutDown() {
 		return shutdownPool(null);
 	}
