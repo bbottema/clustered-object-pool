@@ -1,11 +1,12 @@
-[![APACHE v2 License](https://img.shields.io/badge/license-apachev2-blue.svg?style=flat)](LICENSE-2.0.txt) [![Latest Release](https://img.shields.io/maven-central/v/com.github.bbottema/clustered-object-pool.svg?style=flat)](http://search.maven.org/#search%7Cgav%7C1%7Cg%3A%22com.github.bbottema%22%20AND%20a%3A%22clustered-object-pool%22) [![Build Status](https://img.shields.io/badge/CircleCI-build-brightgreen.svg?style=flat)](https://circleci.com/gh/bbottema/clustered-object-pool) [![Codacy](https://img.shields.io/codacy/grade/7a0dc698534d4c9eb459709f7c3fbfe5.svg?style=flat)](https://www.codacy.com/app/b-bottema/clustered-object-pool)
+[![APACHE v2 License](https://img.shields.io/badge/license-apachev2-blue.svg?style=flat)](LICENSE-2.0.txt) 
+[![Latest Release](https://img.shields.io/maven-central/v/com.github.bbottema/clustered-object-pool.svg?style=flat)](http://search.maven.org/#search%7Cgav%7C1%7Cg%3A%22com.github.bbottema%22%20AND%20a%3A%22clustered-object-pool%22) 
+[![Javadocs](https://img.shields.io/badge/javadoc-1.0.9-brightgreen.svg?color=brightgreen)](https://www.javadoc.io/doc/com.github.bbottema/clustered-object-pool) 
+[![Codacy](https://img.shields.io/codacy/grade/7a0dc698534d4c9eb459709f7c3fbfe5.svg?style=flat)](https://www.codacy.com/app/b-bottema/clustered-object-pool)
 
 # clustered-object-pool
 
 clustered-object-pool is a lightweight generic clustering object pool, building on generic-object-pool and adding
-keyed clustered pools. 
-
-[API Documentation](https://www.javadoc.io/doc/com.github.bbottema/clustered-object-pool/1.0.0)
+keyed clustered pools.
 
 ## Setup
 
@@ -15,7 +16,7 @@ Maven Dependency Setup
 <dependency>
 	<groupId>com.github.bbottema</groupId>
 	<artifactId>clustered-object-pool</artifactId>
-	<version>x.y.z</version>
+	<version>1.0.9</version>
 </dependency>
 ```
 
