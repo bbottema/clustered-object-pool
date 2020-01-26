@@ -18,6 +18,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Future;
 
+import static java.lang.String.format;
+
 /**
  * Collection of clusters, each containing a number of (generic-object-pool) resource pools. Relies on the native generic-object-pool behavior for
  * auto-replenishing and pre-allocating resources (so always allocates / fills up to max pool size).
@@ -164,7 +166,7 @@ public class ResourceClusters<ClusterKey, PoolKey, T> {
 	private synchronized ResourcePool<PoolKey, T> cycleToNextPool(final ClusterKey clusterKey) {
 		ResourcePools<PoolKey, T> cluster = findOrCreateCluster(clusterKey);
 		if (cluster.getClusterCollection().isEmpty()) {
-			throw new IllegalStateException("Cluster contains no pools to draw from");
+			throw new IllegalStateException(format("Cluster contains no pools to draw from for key '%s'", cluster));
 		}
 		return loadBalancingStrategy.cycle(cluster.getClusterCollection());
 	}
