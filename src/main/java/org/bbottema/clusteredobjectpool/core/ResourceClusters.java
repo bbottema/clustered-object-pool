@@ -3,7 +3,7 @@ package org.bbottema.clusteredobjectpool.core;
 import lombok.Getter;
 import org.bbottema.clusteredobjectpool.core.api.LoadBalancingStrategy;
 import org.bbottema.clusteredobjectpool.core.api.ResourceKey;
-import org.bbottema.clusteredobjectpool.util.CompositeFuture;
+import org.bbottema.clusteredobjectpool.util.CompositeFuturesAsFutureTask;
 import org.bbottema.genericobjectpool.ExpirationPolicy;
 import org.bbottema.genericobjectpool.GenericObjectPool;
 import org.bbottema.genericobjectpool.PoolConfig;
@@ -147,12 +147,12 @@ public class ResourceClusters<ClusterKey, PoolKey, T> {
 	 * After calling this, the cluster is ready for more work as if it was just created.
 	 */
 	@SuppressWarnings("WeakerAccess")
-	public synchronized Future<?> shutdownPool(@Nullable final PoolKey key) {
-		final List<Future> poolsShuttingDown = new ArrayList<>();
+	public synchronized Future<Void> shutdownPool(@Nullable final PoolKey key) {
+		final List<Future<Void>> poolsShuttingDown = new ArrayList<>();
 		for (final ResourcePools<PoolKey, T> resourcePools : resourceClusters.values()) {
 			poolsShuttingDown.add(resourcePools.shutdownPool(key));
 		}
-		return new CompositeFuture(poolsShuttingDown);
+		return CompositeFuturesAsFutureTask.ofFutures(poolsShuttingDown);
 	}
 
 	private synchronized ResourcePools<PoolKey, T> findOrCreateCluster(final ClusterKey clusterKey) {

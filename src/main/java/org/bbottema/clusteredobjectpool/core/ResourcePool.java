@@ -20,7 +20,7 @@ class ResourcePool<PoolKey, T> {
 	final PoolKey poolKey;
 	final GenericObjectPool<T> pool;
 	
-	Future<?> clearPool() {
+	Future<Void> clearPool() {
 		return pool.shutdown();
 	}
 	
