@@ -16,12 +16,12 @@ public class CompositeFuturesAsFutureTask extends FutureTask<Void> {
 				.submit(new CompositeFuturesAsFutureTask(futures), null);
 	}
 
-	private CompositeFuturesAsFutureTask(final List<Future<Void>> future) {
+	private CompositeFuturesAsFutureTask(final List<Future<Void>> futures) {
 		super(new Callable<Void>() {
 			@Override
 			public Void call() throws ExecutionException, InterruptedException {
-				while (!future.isEmpty()) {
-					future.iterator().next().get();
+				for (Future<Void> future : futures) {
+					future.get();
 				}
 				return null;
 			}
