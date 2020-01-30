@@ -4,7 +4,7 @@ https://github.com/bbottema/clustered-object-pool
 RELEASE NOTES clustered-object-pool
 
 
-v1.0.10
+v1.0.10 - v1.0.11 (30 Januari 2020)
 
 - The composite future that aggregates all pools shutdown futures didn't actually run and .get() would block indefinately
 
