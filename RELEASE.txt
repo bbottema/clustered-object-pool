@@ -4,9 +4,10 @@ https://github.com/bbottema/clustered-object-pool
 RELEASE NOTES clustered-object-pool
 
 
-v2.0.2 (27 March 2022)
+v2.0.2 - v2.0.3
 
-- Updated clustered-object-pool which solves a memory leak when 3rd party deallocation fails with an error
+- 3 May 2024: Upgraded release pipeline. Upgraded to new parent pom, which upgrades from Junit4 to Junit5. Upgraded generic-connection-pool which fixes a bug where exceptions during allocations were not handled properly
+- 27 March 2022: Updated clustered-object-pool which solves a memory leak when 3rd party deallocation fails with an error
 
 
 v2.0.0 - v2.0.1 (26 December 2021)
