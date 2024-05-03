@@ -6,7 +6,7 @@
 	<parent>
 		<groupId>com.github.bbottema</groupId>
 		<artifactId>standard-project-parent</artifactId>
-		<version>1.0.24</version>
+		<version>1.0.42</version>
 	</parent>
 
 	<artifactId>clustered-object-pool</artifactId>
@@ -39,7 +39,7 @@
 		<dependency>
 			<groupId>com.github.bbottema</groupId>
 			<artifactId>generic-object-pool</artifactId>
-			<version>2.0.1</version>
+			<version>2.1.0</version>
 		</dependency>
 
 		<dependency>
