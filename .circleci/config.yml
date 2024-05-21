@@ -17,9 +17,6 @@ workflows:
     jobs:
       - github-maven-deploy/build-and-test:
           <<: *mvn-build-test-command
-          filters:
-            branches:
-              only: master
 
       - github-maven-deploy/approve-deploy-patch-version:
           type: approval
