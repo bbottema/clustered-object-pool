@@ -4,6 +4,11 @@ https://github.com/bbottema/clustered-object-pool
 RELEASE NOTES clustered-object-pool
 
 
+v2.1.0 (28-May-2024)
+
+- #4: Update core dependency generic-object-pool to improve performance and solve ConcurrentModificationException
+
+
 v2.0.2 - v2.0.3
 
 - 3 May 2024: Upgraded release pipeline. Upgraded to new parent pom, which upgrades from Junit4 to Junit5. Upgraded generic-connection-pool which fixes a bug where exceptions during allocations were not handled properly
