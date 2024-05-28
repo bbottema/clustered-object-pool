@@ -12,7 +12,7 @@
 	<artifactId>clustered-object-pool</artifactId>
 	<packaging>jar</packaging>
 	<name>clustered-object-pool</name>
-	<version>2.0.3</version>
+	<version>2.1.0</version>
 	<description>Clustered and keyed generic object pools</description>
 	<url>https://github.com/bbottema/clustered-object-pool</url>
 	<inceptionYear>2019</inceptionYear>
