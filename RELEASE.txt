@@ -4,9 +4,10 @@ https://github.com/bbottema/clustered-object-pool
 RELEASE NOTES clustered-object-pool
 
 
-v2.1.0 (28-May-2024)
+v2.1.0 - v2.1.1 (28-May-2024)
 
-- #4: Update core dependency generic-object-pool to improve performance and solve ConcurrentModificationException
+- 03-June-2024: #5: Avoid race condition to create more than one pool for the same key
+- 28-May-2024: #4: Update core dependency generic-object-pool to improve performance and solve ConcurrentModificationException
 
 
 v2.0.2 - v2.0.3
