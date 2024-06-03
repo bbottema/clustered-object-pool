@@ -70,7 +70,7 @@ public class ResourceClusters<ClusterKey, PoolKey, T> {
 	 * @throws IllegalArgumentException if the pool already exists in the specified cluster.
 	 */
 	@SuppressWarnings("WeakerAccess")
-	public void registerResourcePool(@NotNull final ResourceKey<ClusterKey, PoolKey> key,
+	public synchronized void registerResourcePool(@NotNull final ResourceKey<ClusterKey, PoolKey> key,
 									 @NotNull final ExpirationPolicy<T> expirationPolicy,
 									 final int corePoolSize,
 									 final int maxPoolSize) throws IllegalArgumentException {
