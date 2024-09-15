@@ -61,7 +61,7 @@ PoolableObject<Transport> resource = clusters.claimResourceFromPool(new Resource
 #### Customizing pools
 
 ```java
-// the following has the same behavior as not prergistering and registering on the fly when claiming resources
+// the following has the same behavior as not preregistering and registering on the fly when claiming resources
 // it simply uses the global defaults
 clusters.registerResourcePool(new ResourceClusterAndPoolKey<>(keyCluster1, SessionForServerA));
 clusters.registerResourcePool(new ResourceClusterAndPoolKey<>(keyCluster1, SessionForServerB));
