@@ -49,11 +49,11 @@ public class ResourceClusters<ClusterKey, PoolKey, T> {
 
 	@NotNull private final Map<ClusterKey, ResourcePools<PoolKey, T>> resourceClusters = new HashMap<>();
 	@Getter
-	@NotNull private final ClusterConfig<PoolKey, T> clusterConfig;
+	@NotNull private final ClusterConfig<ClusterKey, PoolKey, T> clusterConfig;
 	@NotNull private final LoadBalancingStrategy<ResourcePool<PoolKey, T>, Collection<ResourcePool<PoolKey, T>>> loadBalancingStrategy;
 
 	@SuppressWarnings({"unused", "unchecked"})
-	public ResourceClusters(final ClusterConfig<PoolKey, T> clusterConfig) {
+	public ResourceClusters(final ClusterConfig<ClusterKey, PoolKey, T> clusterConfig) {
 		this.clusterConfig = clusterConfig;
 		this.loadBalancingStrategy = clusterConfig.getLoadBalancingStrategy();
 	}
@@ -86,7 +86,7 @@ public class ResourceClusters<ClusterKey, PoolKey, T> {
 				.corePoolsize(corePoolSize)
 				.maxPoolsize(maxPoolSize)
 				.expirationPolicy(expirationPolicy)
-				.build(), clusterConfig.getAllocatorFactory().create(key.getPoolKey()));
+				.build(), clusterConfig.getAllocatorFactory().create(key));
 		
 		cluster.add(new ResourcePool<>(key.getPoolKey(), pool));
 	}
@@ -131,7 +131,7 @@ public class ResourceClusters<ClusterKey, PoolKey, T> {
 	 */
 	@Nullable
 	public PoolableObject<T> claimMatchingResourceFromPool(@NotNull final ResourceKey<ClusterKey, PoolKey> key,
-												  @NotNull final Predicate<PoolableObject<T>> predicate) throws InterruptedException {
+														  @NotNull final Predicate<PoolableObject<T>> predicate) throws InterruptedException {
 		return claimMatchingResourceFromPool(key, predicate, clusterConfig.getClaimTimeout());
 	}
 
@@ -143,8 +143,8 @@ public class ResourceClusters<ClusterKey, PoolKey, T> {
 	 */
 	@Nullable
 	public PoolableObject<T> claimMatchingResourceFromPool(@NotNull final ResourceKey<ClusterKey, PoolKey> key,
-												  @NotNull final Predicate<PoolableObject<T>> predicate,
-												  @NotNull final Timeout claimTimeout) throws InterruptedException {
+														  @NotNull final Predicate<PoolableObject<T>> predicate,
+														  @NotNull final Timeout claimTimeout) throws InterruptedException {
 		final ResourcePools<PoolKey, T> cluster = resourceClusters.get(key.getClusterKey());
 		if (cluster == null || !cluster.containsPool(key.getPoolKey())) {
 			return null;

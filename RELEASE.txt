@@ -6,7 +6,13 @@ RELEASE NOTES clustered-object-pool
 
 v2.1.2 - v3.0.0 (05-Jul-2026)
 
+- 05-Jul-2026: #1: Refactored allocator factories to receive the full typed resource key, including both cluster and pool identity
 - 05-Jul-2026: Updated generic-object-pool to 2.4.0 and exposed claimMatchingResourceFromPool(...) for idle maintenance / keep-alive workflows
+
+
+v2.1.1 - v2.1.2 (15-Sep-2024)
+
+- 15-Sep-2024: Updated generic-object-pool dependency to reduce log spam
 
 
 v2.1.0 - v2.1.1 (28-May-2024)

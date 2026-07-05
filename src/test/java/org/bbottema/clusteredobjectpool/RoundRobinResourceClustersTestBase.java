@@ -2,6 +2,7 @@ package org.bbottema.clusteredobjectpool;
 
 import org.bbottema.clusteredobjectpool.core.ResourceClusters;
 import org.bbottema.clusteredobjectpool.core.api.AllocatorFactory;
+import org.bbottema.clusteredobjectpool.core.api.ResourceKey;
 import org.bbottema.clusteredobjectpool.core.api.ResourceKey.ResourceClusterAndPoolKey;
 import org.bbottema.genericobjectpool.Allocator;
 import org.bbottema.genericobjectpool.PoolableObject;
@@ -57,7 +58,7 @@ public abstract class RoundRobinResourceClustersTestBase {
 		claimedResources.add(requireNonNull(poolable));
 		return poolable.getAllocatedObject();
 	}
-	
+
 	boolean waitUntilAllocated(int expectedAllocated, int timeoutMs) {
 		int sleptMs = 0;
 		while (sleptMs < timeoutMs) {
@@ -75,17 +76,18 @@ public abstract class RoundRobinResourceClustersTestBase {
 		return false;
 	}
 
-	public static class DummyAllocatorFactory implements AllocatorFactory<String, String> {
+	public static class DummyAllocatorFactory implements AllocatorFactory<UUID, String, String> {
 		private static final Logger LOGGER = LoggerFactory.getLogger(DummyAllocatorFactory.class);
 		@NotNull
 		@Override
-		public Allocator<String> create(@NotNull final String serverInfo) {
+		public Allocator<String> create(@NotNull final ResourceKey<UUID, String> resourceKey) {
 			return new Allocator<String>() {
 				private int counter = 0;
 				
 				@NotNull
 				@Override
 				public String allocate() {
+					final String serverInfo = resourceKey.getPoolKey();
 					String s = format("connection%s%d", serverInfo.substring(serverInfo.indexOf('_')), ++counter);
 					LOGGER.debug("allocating " + s);
 					return s;

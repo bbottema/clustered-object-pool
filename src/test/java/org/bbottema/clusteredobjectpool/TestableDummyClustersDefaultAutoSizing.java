@@ -9,9 +9,9 @@ import org.jetbrains.annotations.NotNull;
 import java.util.UUID;
 
 class TestableDummyClustersDefaultAutoSizing extends ResourceClusters<UUID, String, String> {
-    TestableDummyClustersDefaultAutoSizing(@NotNull final AllocatorFactory<String, String> allocatorFactory,
+    TestableDummyClustersDefaultAutoSizing(@NotNull final AllocatorFactory<UUID, String, String> allocatorFactory,
                                            @NotNull final ExpirationPolicy<String> defaultExpiration) {
-        super(ClusterConfig.<String, String>builder()
+        super(ClusterConfig.<UUID, String, String>builder()
                 .allocatorFactory(allocatorFactory)
                 .defaultExpirationPolicy(defaultExpiration)
                 .defaultCorePoolSize(4)

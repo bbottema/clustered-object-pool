@@ -1,6 +1,6 @@
 [![APACHE v2 License](https://img.shields.io/badge/license-apachev2-blue.svg?style=flat)](LICENSE-2.0.txt) 
 [![Latest Release](https://img.shields.io/maven-central/v/com.github.bbottema/clustered-object-pool.svg?style=flat)](http://search.maven.org/#search%7Cgav%7C1%7Cg%3A%22com.github.bbottema%22%20AND%20a%3A%22clustered-object-pool%22) 
-[![Javadocs](https://img.shields.io/badge/javadoc-2.1.1-brightgreen.svg?color=brightgreen)](https://www.javadoc.io/doc/com.github.bbottema/clustered-object-pool) 
+[![Javadocs](https://img.shields.io/badge/javadoc-3.0.0-brightgreen.svg?color=brightgreen)](https://www.javadoc.io/doc/com.github.bbottema/clustered-object-pool)
 [![Codacy](https://img.shields.io/codacy/grade/7a0dc698534d4c9eb459709f7c3fbfe5.svg?style=flat)](https://www.codacy.com/app/b-bottema/clustered-object-pool)
 
 # clustered-object-pool
@@ -16,7 +16,7 @@ Maven Dependency Setup
 <dependency>
 	<groupId>com.github.bbottema</groupId>
 	<artifactId>clustered-object-pool</artifactId>
-	<version>2.1.1</version>
+	<version>3.0.0</version>
 </dependency>
 ```
 
@@ -41,7 +41,7 @@ for which there is actually a dedicated micro library, [smtp-connection-pool](ht
 
 ```java
 // basic pool with no eager loading and no expiry policy and default round robin pool rotation
-ClusterConfig<Session, Transport> clusterConfig = ClusterConfig.<Session, Transport>builder()
+ClusterConfig<UUID, Session, Transport> clusterConfig = ClusterConfig.<UUID, Session, Transport>builder()
     .allocatorFactory(allocatorFactory)
     .defaultMaxPoolSize(defaultMaxPoolSize)
     .build();
@@ -107,10 +107,10 @@ when a new pool is being created.
 For SMTP connections, here's a possible implementation:
 
 ```java
-class TransportAllocatorFactory implements AllocatorFactory<Session, Transport> {
+class TransportAllocatorFactory implements AllocatorFactory<UUID, Session, Transport> {
 	@Override
-	public Allocator<Transport> create(Session session) {
-		return new TransportAllocator(session);
+	public Allocator<Transport> create(ResourceKey<UUID, Session> resourceKey) {
+		return new TransportAllocator(resourceKey.getClusterKey(), resourceKey.getPoolKey());
 	}
 }
 
@@ -120,7 +120,7 @@ class TransportAllocator extends Allocator<Transport> {
 
 	private final Session session;
 
-	TransportAllocator(final Session session) {
+	TransportAllocator(final UUID clusterKey, final Session session) {
 		this.session = session;
 	}
 
@@ -146,14 +146,14 @@ class TransportAllocator extends Allocator<Transport> {
 }
 ```
 Now each time a specific pool created -either by claiming for it or pre-registering-, this factory is invoked
-with the respective pool key (the Session instance representing the server).
+with the respective resource key, containing both the cluster key and pool key (the Session instance representing the server).
 
 #### Load balancing strategies
 
 By default, load is balanced round robin, but you can easily use a different strategy. For example, to use the provided random balancer instead:
 
 ```java
-ClusterConfig<Session, Transport> clusterConfig = ClusterConfig.<Session, Transport>builder()
+ClusterConfig<UUID, Session, Transport> clusterConfig = ClusterConfig.<UUID, Session, Transport>builder()
     .loadBalancingStrategy(new RandomAccessLoadBalancing())
     .(..)
     .build();

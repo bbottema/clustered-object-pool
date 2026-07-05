@@ -14,6 +14,7 @@ import org.bbottema.genericobjectpool.util.Timeout;
 import org.jetbrains.annotations.NotNull;
 
 /**
+ * @param <ClusterKey> See {@link ResourceClusters}.
  * @param <PoolKey> See {@link ResourceClusters}.
  * @param <T>       See {@link ResourceClusters}.
  */
@@ -21,12 +22,12 @@ import org.jetbrains.annotations.NotNull;
 @Builder
 @AllArgsConstructor(access = AccessLevel.PRIVATE)
 @SuppressFBWarnings(justification = "Generated code")
-public class ClusterConfig<PoolKey, T> {
+public class ClusterConfig<ClusterKey, PoolKey, T> {
     
     /**
-     * Produces allocators for when generic-object-pool expands an object pool. For example to obtains a new {@code Transport} connection for {@code PoolKey} Session.
+     * Produces allocators for when generic-object-pool expands an object pool. For example to obtain a new {@code Transport} connection for {@code PoolKey} Session.
      */
-    @NotNull private final AllocatorFactory<PoolKey, T> allocatorFactory;
+    @NotNull private final AllocatorFactory<ClusterKey, PoolKey, T> allocatorFactory;
     /**
      * Default expiration policy (generic-object-pool parameter) to use if a specific one is not provided when registering a new resource pool.
      */
