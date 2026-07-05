@@ -4,10 +4,11 @@ https://github.com/bbottema/clustered-object-pool
 RELEASE NOTES clustered-object-pool
 
 
-v2.1.2 - v3.0.0 (05-Jul-2026)
+v2.1.2 - v4.0.0 (05-Jul-2026)
 
 - 05-Jul-2026: #1: Refactored allocator factories to receive the full typed resource key, including both cluster and pool identity
 - 05-Jul-2026: Updated generic-object-pool to 2.4.0 and exposed claimMatchingResourceFromPool(...) for idle maintenance / keep-alive workflows
+- 05-Jul-2026: Note: 3.0.0 was skipped by the release pipeline; these changes were first published as 4.0.0
 
 
 v2.1.1 - v2.1.2 (15-Sep-2024)
