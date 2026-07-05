@@ -58,6 +58,23 @@ public abstract class RoundRobinResourceClustersTestBase {
 		return poolable.getAllocatedObject();
 	}
 	
+	boolean waitUntilAllocated(int expectedAllocated, int timeoutMs) {
+		int sleptMs = 0;
+		while (sleptMs < timeoutMs) {
+			if (clusters.countLiveResources() == expectedAllocated) {
+				return true;
+			}
+			try {
+				TimeUnit.MILLISECONDS.sleep(25);
+			} catch (InterruptedException e) {
+				Thread.currentThread().interrupt();
+				return false;
+			}
+			sleptMs += 25;
+		}
+		return false;
+	}
+
 	public static class DummyAllocatorFactory implements AllocatorFactory<String, String> {
 		private static final Logger LOGGER = LoggerFactory.getLogger(DummyAllocatorFactory.class);
 		@NotNull

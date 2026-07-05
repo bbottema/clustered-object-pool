@@ -78,6 +78,27 @@ The above example creates clusters and pools on the fly as resources are claimed
 except for serverA in cluster1: for this server, 10 connections are preloaded with 10 max connections allowed at
 busy times and with auto expiring connections, disconnection spreading between 5 to 10 seconds after a connection was last used.
 
+#### Idle maintenance
+
+```java
+PoolableObject<Transport> resource = clusters.claimMatchingResourceFromPool(
+    new ResourceClusterAndPoolKey<>(keyCluster1, SessionForServerA),
+    poolable -> poolable.idleAgeMs() >= TimeUnit.MINUTES.toMillis(5),
+    new Timeout(1, TimeUnit.SECONDS));
+
+if (resource != null) {
+    try {
+        keepAlive(resource.getAllocatedObject());
+        resource.release();
+    } catch (Exception e) {
+        resource.invalidate();
+    }
+}
+```
+
+`claimMatchingResourceFromPool` only claims from an already registered pool and does not create new pools or resources.
+The predicate is evaluated while the underlying pool claim lock is held, so keep it fast and side-effect free.
+
 #### Providing objects for the clustered pools
 
 Normally you would provide an Allocator to the underlying generic-object-pool, now you provide an AllocatorFactory for

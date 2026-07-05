@@ -8,6 +8,7 @@ import org.bbottema.genericobjectpool.ExpirationPolicy;
 import org.bbottema.genericobjectpool.GenericObjectPool;
 import org.bbottema.genericobjectpool.PoolConfig;
 import org.bbottema.genericobjectpool.PoolableObject;
+import org.bbottema.genericobjectpool.util.Timeout;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -17,6 +18,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Future;
+import java.util.function.Predicate;
 
 import static java.lang.String.format;
 
@@ -121,6 +123,33 @@ public class ResourceClusters<ClusterKey, PoolKey, T> {
 			registerResourcePool(key);
 		}
 		return cluster.claimResource(key.getPoolKey(), clusterConfig.getClaimTimeout());
+	}
+
+	/**
+	 * Delegates to {@link #claimMatchingResourceFromPool(ResourceKey, Predicate, Timeout)}
+	 * using the global claim timeout.
+	 */
+	@Nullable
+	public PoolableObject<T> claimMatchingResourceFromPool(@NotNull final ResourceKey<ClusterKey, PoolKey> key,
+												  @NotNull final Predicate<PoolableObject<T>> predicate) throws InterruptedException {
+		return claimMatchingResourceFromPool(key, predicate, clusterConfig.getClaimTimeout());
+	}
+
+	/**
+	 * Claims an already available object matching the predicate from an already registered pool.
+	 * <p>
+	 * This method does not register new pools or allocate new resources. Keep the predicate fast and side-effect free;
+	 * slow work such as ping/keep-alive checks should run after the resource has been claimed.
+	 */
+	@Nullable
+	public PoolableObject<T> claimMatchingResourceFromPool(@NotNull final ResourceKey<ClusterKey, PoolKey> key,
+												  @NotNull final Predicate<PoolableObject<T>> predicate,
+												  @NotNull final Timeout claimTimeout) throws InterruptedException {
+		final ResourcePools<PoolKey, T> cluster = resourceClusters.get(key.getClusterKey());
+		if (cluster == null || !cluster.containsPool(key.getPoolKey())) {
+			return null;
+		}
+		return cluster.claimMatchingResource(key.getPoolKey(), predicate, claimTimeout);
 	}
 	
 	/**

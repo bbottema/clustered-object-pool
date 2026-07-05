@@ -14,6 +14,7 @@ import java.util.Collection;
 import java.util.Iterator;
 import java.util.List;
 import java.util.concurrent.Future;
+import java.util.function.Predicate;
 
 /**
  * Serves to hide some methods that iterate over a cluster of pools.
@@ -54,6 +55,15 @@ class ResourcePools<PoolKey, T> {
 			throw new IllegalArgumentException("Couldn't find resource pool with key: " + poolKey);
 		}
 		return resourcePool.claim(claimTimeout);
+	}
+
+	@Nullable
+	PoolableObject<T> claimMatchingResource(PoolKey poolKey, Predicate<PoolableObject<T>> predicate, Timeout claimTimeout) throws InterruptedException {
+		ResourcePool<PoolKey, T> resourcePool = findResourcePool(poolKey);
+		if (resourcePool == null) {
+			throw new IllegalArgumentException("Couldn't find resource pool with key: " + poolKey);
+		}
+		return resourcePool.claimMatching(predicate, claimTimeout);
 	}
 	
 	@Nullable

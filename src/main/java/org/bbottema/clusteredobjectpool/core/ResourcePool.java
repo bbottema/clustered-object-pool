@@ -10,6 +10,7 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.concurrent.Future;
+import java.util.function.Predicate;
 
 /**
  * Serves to keep track of the poolKey associated with the generic-object-pool pool.
@@ -27,6 +28,11 @@ class ResourcePool<PoolKey, T> {
 	@Nullable
 	PoolableObject<T> claim(Timeout claimTimeout) throws InterruptedException {
 		return pool.claim(claimTimeout);
+	}
+
+	@Nullable
+	PoolableObject<T> claimMatching(Predicate<PoolableObject<T>> predicate, Timeout claimTimeout) throws InterruptedException {
+		return pool.claimMatching(predicate, claimTimeout);
 	}
 	
 	@NotNull
