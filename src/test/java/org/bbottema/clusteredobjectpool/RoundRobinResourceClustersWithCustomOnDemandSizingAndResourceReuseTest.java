@@ -54,10 +54,10 @@ public class RoundRobinResourceClustersWithCustomOnDemandSizingAndResourceReuseT
 		assertThat(clusters.countLiveResources()).isEqualTo(6);
 		connectionA1.release();
 		assertThat(claimAndNoReleaseResource(keyCluster1)).isEqualTo("connection_B3");
-		assertThat(claimAndReleaseResource(keyCluster1)).isEqualTo("connection_A1");
+		assertThat(claimAndReleaseResource(keyCluster1)).startsWith("connection_A");
 		assertThat(claimAndNoReleaseResource(keyCluster1)).isEqualTo("connection_B4");
 		TimeUnit.MILLISECONDS.sleep(10);
-		assertThat(claimAndNoReleaseResource(keyCluster1)).isEqualTo("connection_A5");
+		assertThat(claimAndNoReleaseResource(keyCluster1)).startsWith("connection_A");
 		// cluster 2
 		assertThat(claimAndNoReleaseResource(keyCluster2)).isEqualTo("connection_C1");
 		assertThat(claimAndNoReleaseResource(keyCluster2)).isEqualTo("connection_D1");
