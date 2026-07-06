@@ -48,14 +48,27 @@ import static java.lang.String.format;
 public class ResourceClusters<ClusterKey, PoolKey, T> {
 
 	@NotNull private final Map<ClusterKey, ResourcePools<PoolKey, T>> resourceClusters = new HashMap<>();
+	@NotNull private final Map<ClusterKey, ClusterConfig<ClusterKey, PoolKey, T>> resourceClusterConfigs = new HashMap<>();
 	@Getter
 	@NotNull private final ClusterConfig<ClusterKey, PoolKey, T> clusterConfig;
-	@NotNull private final LoadBalancingStrategy<ResourcePool<PoolKey, T>, Collection<ResourcePool<PoolKey, T>>> loadBalancingStrategy;
 
 	@SuppressWarnings({"unused", "unchecked"})
 	public ResourceClusters(final ClusterConfig<ClusterKey, PoolKey, T> clusterConfig) {
 		this.clusterConfig = clusterConfig;
-		this.loadBalancingStrategy = clusterConfig.getLoadBalancingStrategy();
+	}
+
+	/**
+	 * Registers a cluster-specific configuration. Pools registered for this cluster afterwards use these values as their defaults.
+	 *
+	 * @throws IllegalArgumentException if the cluster already exists.
+	 */
+	public synchronized void registerResourceCluster(@NotNull final ClusterKey clusterKey,
+													 @NotNull final ClusterConfig<ClusterKey, PoolKey, T> clusterConfig) throws IllegalArgumentException {
+		if (resourceClusters.containsKey(clusterKey)) {
+			throw new IllegalArgumentException("Cluster already exists for key " + clusterKey);
+		}
+		resourceClusterConfigs.put(clusterKey, clusterConfig);
+		findOrCreateCluster(clusterKey);
 	}
 	
 	/**
@@ -63,6 +76,7 @@ public class ResourceClusters<ClusterKey, PoolKey, T> {
 	 */
 	@SuppressWarnings("unused")
 	public void registerResourcePool(ResourceKey<ClusterKey, PoolKey> key) {
+		final ClusterConfig<ClusterKey, PoolKey, T> clusterConfig = getClusterConfig(key.getClusterKey());
 		registerResourcePool(key, clusterConfig.getDefaultExpirationPolicy(), clusterConfig.getDefaultCorePoolSize(), clusterConfig.getDefaultMaxPoolSize());
 	}
 	
@@ -98,6 +112,23 @@ public class ResourceClusters<ClusterKey, PoolKey, T> {
 		return resourceClusters.containsKey(key.getClusterKey()) &&
 				resourceClusters.get(key.getClusterKey()).containsPool(key.getPoolKey());
 	}
+
+	/**
+	 * @return If a cluster is registered as a known cluster.
+	 */
+	public boolean isClusterRegistered(@NotNull final ClusterKey clusterKey) {
+		return resourceClusters.containsKey(clusterKey);
+	}
+
+	/**
+	 * @return The cluster-specific config, or the global defaults if the cluster was not registered with specific config.
+	 */
+	@NotNull
+	public ClusterConfig<ClusterKey, PoolKey, T> getClusterConfig(@NotNull final ClusterKey clusterKey) {
+		return resourceClusterConfigs.containsKey(clusterKey)
+				? resourceClusterConfigs.get(clusterKey)
+				: clusterConfig;
+	}
 	
 	/**
 	 * Tries to claim the next resources from a pool in the given cluster. This cluster is assumed to have been populated with
@@ -108,7 +139,7 @@ public class ResourceClusters<ClusterKey, PoolKey, T> {
 	 */
 	@Nullable
 	public PoolableObject<T> claimResourceFromCluster(final ClusterKey clusterKey) throws InterruptedException {
-		return cycleToNextPool(clusterKey).claim(clusterConfig.getClaimTimeout());
+		return cycleToNextPool(clusterKey).claim(getClusterConfig(clusterKey).getClaimTimeout());
 	}
 	
 	/**
@@ -122,7 +153,7 @@ public class ResourceClusters<ClusterKey, PoolKey, T> {
 		if (!cluster.containsPool(key.getPoolKey())) {
 			registerResourcePool(key);
 		}
-		return cluster.claimResource(key.getPoolKey(), clusterConfig.getClaimTimeout());
+		return cluster.claimResource(key.getPoolKey(), getClusterConfig(key.getClusterKey()).getClaimTimeout());
 	}
 
 	/**
@@ -132,7 +163,7 @@ public class ResourceClusters<ClusterKey, PoolKey, T> {
 	@Nullable
 	public PoolableObject<T> claimMatchingResourceFromPool(@NotNull final ResourceKey<ClusterKey, PoolKey> key,
 														  @NotNull final Predicate<PoolableObject<T>> predicate) throws InterruptedException {
-		return claimMatchingResourceFromPool(key, predicate, clusterConfig.getClaimTimeout());
+		return claimMatchingResourceFromPool(key, predicate, getClusterConfig(key.getClusterKey()).getClaimTimeout());
 	}
 
 	/**
@@ -186,7 +217,7 @@ public class ResourceClusters<ClusterKey, PoolKey, T> {
 
 	private synchronized ResourcePools<PoolKey, T> findOrCreateCluster(final ClusterKey clusterKey) {
 		if (!resourceClusters.containsKey(clusterKey)) {
-			Collection<ResourcePool<PoolKey, T>> collectionForCycling = loadBalancingStrategy.createCollectionForCycling();
+			Collection<ResourcePool<PoolKey, T>> collectionForCycling = getLoadBalancingStrategy(clusterKey).createCollectionForCycling();
 			resourceClusters.put(clusterKey, new ResourcePools<>(collectionForCycling));
 		}
 		return resourceClusters.get(clusterKey);
@@ -197,6 +228,12 @@ public class ResourceClusters<ClusterKey, PoolKey, T> {
 		if (cluster.getClusterCollection().isEmpty()) {
 			throw new IllegalStateException(format("Cluster contains no pools to draw from for key '%s'", cluster));
 		}
-		return loadBalancingStrategy.cycle(cluster.getClusterCollection());
+		return getLoadBalancingStrategy(clusterKey).cycle(cluster.getClusterCollection());
+	}
+
+	@SuppressWarnings("unchecked")
+	@NotNull
+	private LoadBalancingStrategy<ResourcePool<PoolKey, T>, Collection<ResourcePool<PoolKey, T>>> getLoadBalancingStrategy(final ClusterKey clusterKey) {
+		return getClusterConfig(clusterKey).getLoadBalancingStrategy();
 	}
 }

@@ -1,6 +1,6 @@
 [![APACHE v2 License](https://img.shields.io/badge/license-apachev2-blue.svg?style=flat)](LICENSE-2.0.txt) 
 [![Latest Release](https://img.shields.io/maven-central/v/com.github.bbottema/clustered-object-pool.svg?style=flat)](http://search.maven.org/#search%7Cgav%7C1%7Cg%3A%22com.github.bbottema%22%20AND%20a%3A%22clustered-object-pool%22) 
-[![Javadocs](https://img.shields.io/badge/javadoc-4.0.0-brightgreen.svg?color=brightgreen)](https://www.javadoc.io/doc/com.github.bbottema/clustered-object-pool)
+[![Javadocs](https://img.shields.io/badge/javadoc-4.0.1-brightgreen.svg?color=brightgreen)](https://www.javadoc.io/doc/com.github.bbottema/clustered-object-pool)
 [![Codacy](https://img.shields.io/codacy/grade/7a0dc698534d4c9eb459709f7c3fbfe5.svg?style=flat)](https://www.codacy.com/app/b-bottema/clustered-object-pool)
 
 # clustered-object-pool
@@ -16,9 +16,15 @@ Maven Dependency Setup
 <dependency>
 	<groupId>com.github.bbottema</groupId>
 	<artifactId>clustered-object-pool</artifactId>
-	<version>4.0.0</version>
+	<version>4.0.1</version>
 </dependency>
 ```
+
+## Release Notes
+
+Unreleased 4.0.1
+
+- [#6](https://github.com/bbottema/clustered-object-pool/issues/6): Added cluster-specific Java configuration so each cluster key can define its own pool defaults, claim timeout, and load-balancing strategy.
 
 ## Usage
 
@@ -77,6 +83,23 @@ clusters.registerResourcePool(new ResourceClusterAndPoolKey<>(keyCluster1, Sessi
 The above example creates clusters and pools on the fly as resources are claimed with the appropriate keys, 
 except for serverA in cluster1: for this server, 10 connections are preloaded with 10 max connections allowed at
 busy times and with auto expiring connections, disconnection spreading between 5 to 10 seconds after a connection was last used.
+
+#### Customizing clusters
+
+```java
+ClusterConfig<UUID, Session, Transport> constrainedClusterConfig = ClusterConfig.<UUID, Session, Transport>builder()
+    .allocatorFactory(allocatorFactory)
+    .defaultCorePoolSize(0)
+    .defaultMaxPoolSize(1)
+    .claimTimeout(new Timeout(30, TimeUnit.SECONDS))
+    .loadBalancingStrategy(new RandomAccessLoadBalancing<>())
+    .build();
+
+clusters.registerResourceCluster(keyCluster2, constrainedClusterConfig);
+clusters.registerResourcePool(new ResourceClusterAndPoolKey<>(keyCluster2, SessionForServerA));
+```
+
+Pools registered for `keyCluster2` now use the cluster-specific defaults. Other clusters still use the global defaults from the `ResourceClusters` constructor unless they are registered with their own config.
 
 #### Idle maintenance
 
