@@ -4,6 +4,13 @@ https://github.com/bbottema/clustered-object-pool
 RELEASE NOTES clustered-object-pool
 
 
+v4.0.2 (10 August 2026)
+
+- Update generic-object-pool to 2.4.1 so shutdown waits for allocator deallocation to finish
+- Stop retaining drained pool records after their shutdown futures complete
+- Include pools that were already draining in later aggregate shutdown futures
+
+
 v2.1.2 - v4.0.0 (05-Jul-2026)
 
 - 05-Jul-2026: #1: Refactored allocator factories to receive the full typed resource key, including both cluster and pool identity

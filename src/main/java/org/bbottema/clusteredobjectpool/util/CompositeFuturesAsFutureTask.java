@@ -13,20 +13,33 @@ import static java.util.concurrent.Executors.newSingleThreadExecutor;
 public class CompositeFuturesAsFutureTask extends FutureTask<Void> {
 
 	public static Future<Void> ofFutures(final List<Future<Void>> futures) {
+		return ofFutures(futures, new Runnable() {
+			@Override
+			public void run() {
+				// no-op
+			}
+		});
+	}
+
+	public static Future<Void> ofFutures(final List<Future<Void>> futures, final Runnable completion) {
 		ExecutorService executorService = newSingleThreadExecutor(defaultThreadFactory());
-		Future<Void> future = executorService.submit(new CompositeFuturesAsFutureTask(futures), null);
+		Future<Void> future = executorService.submit(new CompositeFuturesAsFutureTask(futures, completion), null);
 		executorService.shutdown();
 		return future;
 	}
 
-	private CompositeFuturesAsFutureTask(final List<Future<Void>> futures) {
+	private CompositeFuturesAsFutureTask(final List<Future<Void>> futures, final Runnable completion) {
 		super(new Callable<Void>() {
 			@Override
 			public Void call() throws ExecutionException, InterruptedException {
-				for (Future<Void> future : futures) {
-					future.get();
+				try {
+					for (Future<Void> future : futures) {
+						future.get();
+					}
+					return null;
+				} finally {
+					completion.run();
 				}
-				return null;
 			}
 		});
 	}

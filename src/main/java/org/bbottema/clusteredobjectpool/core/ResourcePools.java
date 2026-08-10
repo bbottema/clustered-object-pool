@@ -13,6 +13,8 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Future;
 import java.util.function.Predicate;
 
@@ -24,20 +26,39 @@ import java.util.function.Predicate;
 class ResourcePools<PoolKey, T> {
 	@Getter(AccessLevel.PACKAGE)
 	private final Collection<ResourcePool<PoolKey, T>> clusterCollection;
-	private final Collection<ResourcePool<PoolKey, T>> poolsShuttingDown = new ArrayList<>();
+	private final Map<ResourcePool<PoolKey, T>, Future<Void>> poolsShuttingDown = new ConcurrentHashMap<>();
 	
 	@SuppressWarnings("UnusedReturnValue")
 	Future<Void> shutdownPool(@Nullable PoolKey key) {
 		final List<Future<Void>> poolsShuttingDownFuture = new ArrayList<>();
+		final List<ResourcePool<PoolKey, T>> poolsBeingRetired = new ArrayList<>();
+		for (Map.Entry<ResourcePool<PoolKey, T>, Future<Void>> retiringPool : poolsShuttingDown.entrySet()) {
+			if (key == null || retiringPool.getKey().getPoolKey().equals(key)) {
+				poolsShuttingDownFuture.add(retiringPool.getValue());
+			}
+		}
 		for (Iterator<ResourcePool<PoolKey, T>> iterator = clusterCollection.iterator(); iterator.hasNext(); ) {
 			ResourcePool<PoolKey, T> poolInCluster = iterator.next();
 			if (key == null || poolInCluster.getPoolKey().equals(key)) {
-				poolsShuttingDownFuture.add(poolInCluster.clearPool());
-				poolsShuttingDown.add(poolInCluster);
+				Future<Void> shutdownFuture = poolInCluster.clearPool();
+				poolsShuttingDownFuture.add(shutdownFuture);
+				poolsShuttingDown.put(poolInCluster, shutdownFuture);
+				poolsBeingRetired.add(poolInCluster);
 				iterator.remove();
 			}
 		}
-		return CompositeFuturesAsFutureTask.ofFutures(poolsShuttingDownFuture);
+		return CompositeFuturesAsFutureTask.ofFutures(poolsShuttingDownFuture, new Runnable() {
+			@Override
+			public void run() {
+				for (ResourcePool<PoolKey, T> retiredPool : poolsBeingRetired) {
+					poolsShuttingDown.remove(retiredPool);
+				}
+			}
+		});
+	}
+
+	int trackedShuttingDownPoolCount() {
+		return poolsShuttingDown.size();
 	}
 	
 	boolean containsPool(PoolKey poolKey) {
@@ -81,7 +102,7 @@ class ResourcePools<PoolKey, T> {
 		for (ResourcePool<PoolKey, T> resourcePool : clusterCollection) {
 			total += resourcePool.getPoolMetrics().getCurrentlyAllocated();
 		}
-		for (ResourcePool<PoolKey, T> resourcePool : poolsShuttingDown) {
+		for (ResourcePool<PoolKey, T> resourcePool : poolsShuttingDown.keySet()) {
 			total += resourcePool.getPoolMetrics().getCurrentlyAllocated();
 		}
 		return total;
