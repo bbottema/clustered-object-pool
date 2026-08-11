@@ -16,13 +16,20 @@ Maven Dependency Setup
 <dependency>
 	<groupId>com.github.bbottema</groupId>
 	<artifactId>clustered-object-pool</artifactId>
-	<version>4.0.1</version>
+	<version>4.0.3</version>
 </dependency>
 ```
 
+For JPMS applications, the published JAR declares the stable automatic module name
+`org.bbottema.clusteredobjectpool`.
+
 ## Release Notes
 
-Unreleased 4.0.1
+4.0.3 (11 August 2026)
+
+- [#8](https://github.com/bbottema/clustered-object-pool/issues/8): Declare the stable JPMS automatic module name `org.bbottema.clusteredobjectpool` and consume the fixed generic pool module.
+
+4.0.1
 
 - [#6](https://github.com/bbottema/clustered-object-pool/issues/6): Added cluster-specific Java configuration so each cluster key can define its own pool defaults, claim timeout, and load-balancing strategy.
 
