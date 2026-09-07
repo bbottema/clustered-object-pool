@@ -52,6 +52,7 @@ class ClaimRecoveryTest {
 		final PoolableObject<Integer> original = claim.call();
 		try {
 			assertThat(original).isNotNull();
+			final Integer originalValue = original.getAllocatedObject();
 			final Future<PoolableObject<Integer>> waiting = executor.submit(() -> {
 				waitingThread.set(Thread.currentThread());
 				final PoolableObject<Integer> result = claim.call();
@@ -62,7 +63,7 @@ class ClaimRecoveryTest {
 			original.invalidate();
 			final PoolableObject<Integer> recovered = waiting.get(2, SECONDS);
 			assertThat(recovered).isNotNull().isNotSameAs(original);
-			assertThat(recovered.getAllocatedObject()).isNotEqualTo(original.getAllocatedObject());
+			assertThat(recovered.getAllocatedObject()).isNotEqualTo(originalValue);
 			assertThat(clusters.countLiveResources()).isOne();
 		} finally {
 			executor.shutdownNow();
