@@ -16,7 +16,7 @@ Maven Dependency Setup
 <dependency>
 	<groupId>com.github.bbottema</groupId>
 	<artifactId>clustered-object-pool</artifactId>
-	<version>4.0.3</version>
+	<version>4.0.4</version>
 </dependency>
 ```
 
@@ -25,9 +25,9 @@ For JPMS applications, the published JAR declares the stable automatic module na
 
 ## Release Notes
 
-4.0.3 (11 August 2026)
+4.0.4 (7 September 2026)
 
-- [#8](https://github.com/bbottema/clustered-object-pool/issues/8): Declare the stable JPMS automatic module name `org.bbottema.clusteredobjectpool` and consume the fixed generic pool module.
+- [#22](https://github.com/bbottema/clustered-object-pool/issues/22): Update `generic-object-pool` to 2.4.3 so waiting keyed and load-balanced claims recover after invalidation or core-pool replenishment. The update also protects concurrent invalidation and shutdown cleanup; Java 8 and the public API are unchanged.
 
 4.0.1
 

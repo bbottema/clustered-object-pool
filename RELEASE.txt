@@ -4,6 +4,17 @@ https://github.com/bbottema/clustered-object-pool
 RELEASE NOTES clustered-object-pool
 
 
+v4.0.4 (7 September 2026)
+
+- #22: Update generic-object-pool to 2.4.3 so waiting keyed and load-balanced claims recover after invalidation or core-pool replenishment; also inherit atomic invalidation and shutdown cleanup fixes (bbottema/generic-object-pool#20).
+- Public API, Java 8 baseline and JPMS automatic module names remain unchanged.
+
+
+v4.0.3 (11 August 2026)
+
+- #8: Declare the stable JPMS automatic module name org.bbottema.clusteredobjectpool and update generic-object-pool to 2.4.2.
+
+
 v4.0.2 (10 August 2026)
 
 - Update generic-object-pool to 2.4.1 so shutdown waits for allocator deallocation to finish
