@@ -19,7 +19,7 @@
 
 	<properties>
 		<automaticModuleName>org.bbottema.clusteredobjectpool</automaticModuleName>
-		<generic-object-pool.version>2.4.3</generic-object-pool.version>
+		<generic-object-pool.version>2.5.0</generic-object-pool.version>
 		<license.owner.name>Benny Bottema</license.owner.name>
 		<license.owner.email>benny@bennybottema.com</license.owner.email>
 	</properties>

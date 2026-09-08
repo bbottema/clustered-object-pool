@@ -4,6 +4,8 @@ import lombok.Getter;
 import org.bbottema.clusteredobjectpool.core.api.LoadBalancingStrategy;
 import org.bbottema.clusteredobjectpool.core.api.ResourceKey;
 import org.bbottema.clusteredobjectpool.util.CompositeFuturesAsFutureTask;
+import org.bbottema.genericobjectpool.AllocationContext;
+import org.bbottema.genericobjectpool.ClaimOptions;
 import org.bbottema.genericobjectpool.ExpirationPolicy;
 import org.bbottema.genericobjectpool.GenericObjectPool;
 import org.bbottema.genericobjectpool.PoolConfig;
@@ -18,13 +20,15 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Future;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Predicate;
 
-import static java.lang.String.format;
+import static java.util.Objects.requireNonNull;
 
 /**
  * Collection of clusters, each containing a number of (generic-object-pool) resource pools. Relies on the native generic-object-pool behavior for
- * auto-replenishing and pre-allocating resources (so always allocates / fills up to max pool size).
+ * auto-replenishing and pre-allocating resources (prefilling the configured core size, growing on demand up to the maximum).
  * <p>
  * Can be used to configure high performance clusters of expensive resources that have a time-to-live.
  * <p>
@@ -47,193 +51,284 @@ import static java.lang.String.format;
 @SuppressWarnings("unused")
 public class ResourceClusters<ClusterKey, PoolKey, T> {
 
-	@NotNull private final Map<ClusterKey, ResourcePools<PoolKey, T>> resourceClusters = new HashMap<>();
-	@NotNull private final Map<ClusterKey, ClusterConfig<ClusterKey, PoolKey, T>> resourceClusterConfigs = new HashMap<>();
-	@Getter
-	@NotNull private final ClusterConfig<ClusterKey, PoolKey, T> clusterConfig;
+	private final Lock registryLock = new ReentrantLock();
+	// Existing strategies remain serialized, but they never hold the registry's bookkeeping lock.
+	private final Lock selectionLock = new ReentrantLock();
+	private final Map<ClusterKey, ResourcePools<PoolKey, T>> resourceClusters = new HashMap<>();
+	private final Map<ClusterKey, ClusterConfig<ClusterKey, PoolKey, T>> resourceClusterConfigs = new HashMap<>();
+	@Getter @NotNull private final ClusterConfig<ClusterKey, PoolKey, T> clusterConfig;
 
-	@SuppressWarnings({"unused", "unchecked"})
 	public ResourceClusters(final ClusterConfig<ClusterKey, PoolKey, T> clusterConfig) {
-		this.clusterConfig = clusterConfig;
+		this.clusterConfig = requireNonNull(clusterConfig, "clusterConfig");
 	}
 
 	/**
-	 * Registers a cluster-specific configuration. Pools registered for this cluster afterwards use these values as their defaults.
+	 * Registers cluster-specific defaults for pools registered afterwards.
 	 *
-	 * @throws IllegalArgumentException if the cluster already exists.
+	 * @throws IllegalArgumentException if the cluster already exists
 	 */
-	public synchronized void registerResourceCluster(@NotNull final ClusterKey clusterKey,
-													 @NotNull final ClusterConfig<ClusterKey, PoolKey, T> clusterConfig) throws IllegalArgumentException {
-		if (resourceClusters.containsKey(clusterKey)) {
-			throw new IllegalArgumentException("Cluster already exists for key " + clusterKey);
+	public void registerResourceCluster(@NotNull final ClusterKey key,
+			@NotNull final ClusterConfig<ClusterKey, PoolKey, T> config) {
+		final ResourcePools<PoolKey, T> cluster;
+		registryLock.lock();
+		try {
+			if (resourceClusters.containsKey(key)) {
+				throw new IllegalArgumentException("Cluster already exists for key " + key);
+			}
+			resourceClusterConfigs.put(key, config);
+			cluster = createCluster(key);
+		} finally {
+			registryLock.unlock();
 		}
-		resourceClusterConfigs.put(clusterKey, clusterConfig);
-		findOrCreateCluster(clusterKey);
+		prepareLegacySelection(cluster);
 	}
-	
-	/**
-	 * Delegates to {@link #registerResourcePool(ResourceKey, ExpirationPolicy, int, int)}, using the global defaults for expiration policy, max pool size and sizing mode.
-	 */
-	@SuppressWarnings("unused")
-	public void registerResourcePool(ResourceKey<ClusterKey, PoolKey> key) {
-		final ClusterConfig<ClusterKey, PoolKey, T> clusterConfig = getClusterConfig(key.getClusterKey());
-		registerResourcePool(key, clusterConfig.getDefaultExpirationPolicy(), clusterConfig.getDefaultCorePoolSize(), clusterConfig.getDefaultMaxPoolSize());
-	}
-	
-	/**
-	 * Registers a new pool for the given cluster. If the cluster is new as well, it will also be created. The new pool is backed by a {@link GenericObjectPool}.
-	 *
-	 * @throws IllegalArgumentException if the pool already exists in the specified cluster.
-	 */
-	@SuppressWarnings("WeakerAccess")
-	public synchronized void registerResourcePool(@NotNull final ResourceKey<ClusterKey, PoolKey> key,
-									 @NotNull final ExpirationPolicy<T> expirationPolicy,
-									 final int corePoolSize,
-									 final int maxPoolSize) throws IllegalArgumentException {
-		final ResourcePools<PoolKey, T> cluster = findOrCreateCluster(key.getClusterKey());
 
-		if (cluster.containsPool(key.getPoolKey())) {
-			throw new IllegalArgumentException("Pool already exists for " + key);
-		}
-		
-		final GenericObjectPool<T> pool = new GenericObjectPool<>(PoolConfig.<T>builder()
-				.corePoolsize(corePoolSize)
-				.maxPoolsize(maxPoolSize)
-				.expirationPolicy(expirationPolicy)
-				.build(), clusterConfig.getAllocatorFactory().create(key));
-		
-		cluster.add(new ResourcePool<>(key.getPoolKey(), pool));
+	/** Registers a pool using its cluster's default expiration policy and core/max sizing. */
+	public void registerResourcePool(final ResourceKey<ClusterKey, PoolKey> key) {
+		final ClusterConfig<ClusterKey, PoolKey, T> config = getClusterConfig(key.getClusterKey());
+		registerResourcePool(key, config.getDefaultExpirationPolicy(), config.getDefaultCorePoolSize(), config.getDefaultMaxPoolSize());
 	}
-	
+
 	/**
-	 * @return If a cluster and pool combination is registered as a known pool.
+	 * Registers a new pool backed by Generic Object Pool; creates its cluster if necessary.
+	 *
+	 * @throws IllegalArgumentException if that pool is already registered
 	 */
+	public void registerResourcePool(@NotNull final ResourceKey<ClusterKey, PoolKey> key,
+			@NotNull final ExpirationPolicy<T> expirationPolicy, final int corePoolSize, final int maxPoolSize) {
+		try {
+			final ResourcePools<PoolKey, T> cluster = findOrCreateCluster(key.getClusterKey(), null);
+			cluster.register(key.getPoolKey(), () -> newPool(key, expirationPolicy, corePoolSize, maxPoolSize), true, null);
+		} catch (InterruptedException interrupted) {
+			// No interruptible wait is used by this legacy registration route.
+			Thread.currentThread().interrupt();
+			throw new IllegalStateException("Pool registration interrupted", interrupted);
+		}
+	}
+
+	/** Returns whether this cluster/pool identity has been registered. */
 	public boolean isPoolRegistered(@NotNull final ResourceKey<ClusterKey, PoolKey> key) {
-		return resourceClusters.containsKey(key.getClusterKey()) &&
-				resourceClusters.get(key.getClusterKey()).containsPool(key.getPoolKey());
+		final ResourcePools<PoolKey, T> cluster = findCluster(key.getClusterKey());
+		return cluster != null && cluster.containsPool(key.getPoolKey());
 	}
 
-	/**
-	 * @return If a cluster is registered as a known cluster.
-	 */
-	public boolean isClusterRegistered(@NotNull final ClusterKey clusterKey) {
-		return resourceClusters.containsKey(clusterKey);
+	/** Returns whether this cluster is registered. */
+	public boolean isClusterRegistered(@NotNull final ClusterKey key) {
+		return findCluster(key) != null;
 	}
 
-	/**
-	 * @return The cluster-specific config, or the global defaults if the cluster was not registered with specific config.
-	 */
+	/** Returns cluster-specific settings, or the global defaults. */
 	@NotNull
-	public ClusterConfig<ClusterKey, PoolKey, T> getClusterConfig(@NotNull final ClusterKey clusterKey) {
-		return resourceClusterConfigs.containsKey(clusterKey)
-				? resourceClusterConfigs.get(clusterKey)
-				: clusterConfig;
+	public ClusterConfig<ClusterKey, PoolKey, T> getClusterConfig(@NotNull final ClusterKey key) {
+		registryLock.lock();
+		try {
+			return resourceClusterConfigs.getOrDefault(key, clusterConfig);
+		} finally {
+			registryLock.unlock();
+		}
 	}
-	
+
+	/** Selects one pool using the configured strategy, then applies the legacy configured wait timeout. No failover is added. */
+	@Nullable
+	public PoolableObject<T> claimResourceFromCluster(final ClusterKey key) throws InterruptedException {
+		final ResourcePool<PoolKey, T> selected = findOrCreateCluster(key, null).cycle(getLoadBalancingStrategy(key), null);
+		return selected.claim(getClusterConfig(key).getClaimTimeout());
+	}
+
 	/**
-	 * Tries to claim the next resources from a pool in the given cluster. This cluster is assumed to have been populated with
-	 * at least one pool already (because they can't be added without pool key).
-	 * <p>
-	 * Either preregister pools using {@link #claimResourceFromPool(ResourceKey)} or dynamically add pools on-the-fly
-	 * using {@link #registerResourcePool(ResourceKey)} or {@link #registerResourcePool(ResourceKey, ExpirationPolicy, int, int)}.
+	 * Selects one pool and acquires a resource with optional cancellation and one total budget. The configured cluster
+	 * timeout can shorten, but never extend, the caller's budget. Returns null on timeout; cancellation throws
+	 * {@link java.util.concurrent.CancellationException}. A running application callback must return cooperatively.
+	 *
+	 * @since 4.1.0
 	 */
 	@Nullable
-	public PoolableObject<T> claimResourceFromCluster(final ClusterKey clusterKey) throws InterruptedException {
-		return cycleToNextPool(clusterKey).claim(getClusterConfig(clusterKey).getClaimTimeout());
+	public PoolableObject<T> claimResourceFromCluster(final ClusterKey key, final ClaimOptions options) throws InterruptedException {
+		final AllocationContext context = startClaim(key, options);
+		if (context == null) {
+			return null;
+		}
+		final ResourcePools<PoolKey, T> cluster = findOrCreateCluster(key, context);
+		if (cluster == null) {
+			return null;
+		}
+		final ResourcePool<PoolKey, T> selected = cluster.cycle(getLoadBalancingStrategy(key), context);
+		return selected == null || !ClaimBudget.active(context) ? null : selected.claim(context);
 	}
-	
-	/**
-	 * Tries to claim the next resources from the pool in the given cluster. If the cluster key is unknown,
-	 * a new cluster is created with one resources pool to draw from. If the pool key is unknown, a new pool
-	 * to draw from is created for that key.
-	 */
+
+	/** Claims from the specified pool, registering it once if needed, using the legacy configured wait timeout. */
 	@Nullable
 	public PoolableObject<T> claimResourceFromPool(final ResourceKey<ClusterKey, PoolKey> key) throws InterruptedException {
-		final ResourcePools<PoolKey, T> cluster = findOrCreateCluster(key.getClusterKey());
-		if (!cluster.containsPool(key.getPoolKey())) {
-			registerResourcePool(key);
-		}
-		return cluster.claimResource(key.getPoolKey(), getClusterConfig(key.getClusterKey()).getClaimTimeout());
+		final ResourcePool<PoolKey, T> pool = registeredPool(key, null);
+		return pool.claim(getClusterConfig(key.getClusterKey()).getClaimTimeout());
 	}
 
 	/**
-	 * Delegates to {@link #claimMatchingResourceFromPool(ResourceKey, Predicate, Timeout)}
-	 * using the global claim timeout.
+	 * Claims from the specified pool using the same cancellation and budget contract as
+	 * {@link #claimResourceFromCluster(Object, ClaimOptions)}. Concurrent first callers share one registration.
+	 * Once initialization starts it is pool-owned: cancelling its first caller does not delete a neighbour's pool.
+	 * Acquisition cancellation ends at handoff and does not revoke a borrowed object.
+	 *
+	 * @since 4.1.0
 	 */
 	@Nullable
+	public PoolableObject<T> claimResourceFromPool(final ResourceKey<ClusterKey, PoolKey> key, final ClaimOptions options)
+			throws InterruptedException {
+		final AllocationContext context = startClaim(key.getClusterKey(), options);
+		if (context == null) {
+			return null;
+		}
+		final ResourcePool<PoolKey, T> pool = registeredPool(key, context);
+		return pool == null || !ClaimBudget.active(context) ? null : pool.claim(context);
+	}
+
+	/** Delegates to the matching-only route with the applicable cluster's configured timeout. */
+	@Nullable
 	public PoolableObject<T> claimMatchingResourceFromPool(@NotNull final ResourceKey<ClusterKey, PoolKey> key,
-														  @NotNull final Predicate<PoolableObject<T>> predicate) throws InterruptedException {
+			@NotNull final Predicate<PoolableObject<T>> predicate) throws InterruptedException {
 		return claimMatchingResourceFromPool(key, predicate, getClusterConfig(key.getClusterKey()).getClaimTimeout());
 	}
 
+	/** Claims an already available matching resource. Never registers a pool or allocates a resource. */
+	@Nullable
+	public PoolableObject<T> claimMatchingResourceFromPool(@NotNull final ResourceKey<ClusterKey, PoolKey> key,
+			@NotNull final Predicate<PoolableObject<T>> predicate, @NotNull final Timeout timeout) throws InterruptedException {
+		final ResourcePools<PoolKey, T> cluster = findCluster(key.getClusterKey());
+		return cluster == null ? null : cluster.claimMatchingResource(key.getPoolKey(), predicate, timeout);
+	}
+
 	/**
-	 * Claims an already available object matching the predicate from an already registered pool.
-	 * <p>
-	 * This method does not register new pools or allocate new resources. Keep the predicate fast and side-effect free;
-	 * slow work such as ping/keep-alive checks should run after the resource has been claimed.
+	 * Matching-only counterpart of {@link #claimResourceFromPool(ResourceKey, ClaimOptions)}. An absent or not-yet-
+	 * initialized pool stays uninitialized. Keep the predicate fast and side-effect free; it runs under pool bookkeeping.
+	 *
+	 * @since 4.1.0
 	 */
 	@Nullable
 	public PoolableObject<T> claimMatchingResourceFromPool(@NotNull final ResourceKey<ClusterKey, PoolKey> key,
-														  @NotNull final Predicate<PoolableObject<T>> predicate,
-														  @NotNull final Timeout claimTimeout) throws InterruptedException {
-		final ResourcePools<PoolKey, T> cluster = resourceClusters.get(key.getClusterKey());
-		if (cluster == null || !cluster.containsPool(key.getPoolKey())) {
+			@NotNull final Predicate<PoolableObject<T>> predicate, final ClaimOptions options) throws InterruptedException {
+		final AllocationContext context = startClaim(key.getClusterKey(), options);
+		if (context == null || !ClaimBudget.acquire(registryLock, context)) {
 			return null;
 		}
-		return cluster.claimMatchingResource(key.getPoolKey(), predicate, claimTimeout);
+		final ResourcePools<PoolKey, T> cluster;
+		try {
+			cluster = resourceClusters.get(key.getClusterKey());
+		} finally {
+			registryLock.unlock();
+		}
+		return cluster == null || !ClaimBudget.active(context) ? null : cluster.claimMatchingResource(key.getPoolKey(), predicate, context);
 	}
-	
-	/**
-	 * @return The number of resources currently allocated and ready to be used.
-	 */
+
+	/** Counts live resources, including pools whose retirement is still in progress. */
 	public int countLiveResources() {
 		int total = 0;
-		for (final ResourcePools<PoolKey, T> resourcePools : resourceClusters.values()) {
-			total += resourcePools.currentlyAllocated();
+		for (final ResourcePools<PoolKey, T> cluster : clustersSnapshot()) {
+			total += cluster.currentlyAllocated();
 		}
 		return total;
 	}
-	
-	/**
-	 * Delegates to {@link #shutdownPool(Object)} with empty pool key.
-	 */
-	@SuppressWarnings("UnusedReturnValue")
-	public synchronized Future<?> shutDown() {
+
+	/** Delegates to {@link #shutdownPool(Object)} for all pool keys. */
+	public Future<?> shutDown() {
 		return shutdownPool(null);
 	}
-	
+
 	/**
-	 * Tells all generic-object-pool pools [for the specified pool key] to shutdown and removes them from the clusters.<p>
-	 * After calling this, the cluster is ready for more work as if it was just created.
+	 * Retires currently registered pools for this key (all keys when null). The future includes in-progress
+	 * initialization and disposal. Later registrations are new work; the clusters remain reusable after shutdown.
 	 */
-	@SuppressWarnings("WeakerAccess")
-	public synchronized Future<Void> shutdownPool(@Nullable final PoolKey key) {
-		final List<Future<Void>> poolsShuttingDown = new ArrayList<>();
-		for (final ResourcePools<PoolKey, T> resourcePools : resourceClusters.values()) {
-			poolsShuttingDown.add(resourcePools.shutdownPool(key));
+	public Future<Void> shutdownPool(@Nullable final PoolKey key) {
+		final List<Future<Void>> completions = new ArrayList<>();
+		for (final ResourcePools<PoolKey, T> cluster : clustersSnapshot()) {
+			completions.add(cluster.shutdownPool(key));
 		}
-		return CompositeFuturesAsFutureTask.ofFutures(poolsShuttingDown);
+		return CompositeFuturesAsFutureTask.ofFutures(completions);
 	}
 
-	private synchronized ResourcePools<PoolKey, T> findOrCreateCluster(final ClusterKey clusterKey) {
-		if (!resourceClusters.containsKey(clusterKey)) {
-			Collection<ResourcePool<PoolKey, T>> collectionForCycling = getLoadBalancingStrategy(clusterKey).createCollectionForCycling();
-			resourceClusters.put(clusterKey, new ResourcePools<>(collectionForCycling));
+	private AllocationContext startClaim(final ClusterKey key, final ClaimOptions options) throws InterruptedException {
+		final AllocationContext context = requireNonNull(options, "options").start();
+		if (!ClaimBudget.acquire(registryLock, context)) {
+			return null;
 		}
-		return resourceClusters.get(clusterKey);
+		try {
+			final AllocationContext limited = context.limitedTo(resourceClusterConfigs.getOrDefault(key, clusterConfig).getClaimTimeout());
+			return ClaimBudget.active(limited) ? limited : null;
+		} finally {
+			registryLock.unlock();
+		}
 	}
 
-	private synchronized ResourcePool<PoolKey, T> cycleToNextPool(final ClusterKey clusterKey) {
-		ResourcePools<PoolKey, T> cluster = findOrCreateCluster(clusterKey);
-		if (cluster.getClusterCollection().isEmpty()) {
-			throw new IllegalStateException(format("Cluster contains no pools to draw from for key '%s'", cluster));
+	private ResourcePool<PoolKey, T> registeredPool(final ResourceKey<ClusterKey, PoolKey> key, final AllocationContext context)
+			throws InterruptedException {
+		final ResourcePools<PoolKey, T> cluster = findOrCreateCluster(key.getClusterKey(), context);
+		if (cluster == null) {
+			return null;
 		}
-		return getLoadBalancingStrategy(clusterKey).cycle(cluster.getClusterCollection());
+		final ClusterConfig<ClusterKey, PoolKey, T> config = getClusterConfig(key.getClusterKey());
+		return cluster.register(key.getPoolKey(), () -> newPool(key, config.getDefaultExpirationPolicy(),
+				config.getDefaultCorePoolSize(), config.getDefaultMaxPoolSize()), false, context);
+	}
+
+	private GenericObjectPool<T> newPool(final ResourceKey<ClusterKey, PoolKey> key, final ExpirationPolicy<T> expiration,
+			final int coreSize, final int maxSize) {
+		return new GenericObjectPool<>(PoolConfig.<T>builder().corePoolsize(coreSize).maxPoolsize(maxSize)
+				.expirationPolicy(expiration).build(), clusterConfig.getAllocatorFactory().create(key));
+	}
+
+	private ResourcePools<PoolKey, T> findOrCreateCluster(final ClusterKey key, final AllocationContext context)
+			throws InterruptedException {
+		if (!ClaimBudget.acquire(registryLock, context)) {
+			return null;
+		}
+		final ResourcePools<PoolKey, T> cluster;
+		try {
+			if (!ClaimBudget.active(context)) {
+				return null;
+			}
+			cluster = resourceClusters.containsKey(key) ? resourceClusters.get(key) : createCluster(key);
+		} finally {
+			registryLock.unlock();
+		}
+		return cluster.prepareSelection(context) ? cluster : null;
+	}
+
+	/** Caller holds registryLock. The strategy factory itself runs later under its separate serialization gate. */
+	private ResourcePools<PoolKey, T> createCluster(final ClusterKey key) {
+		final ResourcePools<PoolKey, T> cluster = new ResourcePools<>(
+				() -> getLoadBalancingStrategy(key).createCollectionForCycling(), selectionLock);
+		resourceClusters.put(key, cluster);
+		return cluster;
+	}
+
+	private ResourcePools<PoolKey, T> findCluster(final ClusterKey key) {
+		registryLock.lock();
+		try {
+			return resourceClusters.get(key);
+		} finally {
+			registryLock.unlock();
+		}
+	}
+
+	private List<ResourcePools<PoolKey, T>> clustersSnapshot() {
+		registryLock.lock();
+		try {
+			return new ArrayList<>(resourceClusters.values());
+		} finally {
+			registryLock.unlock();
+		}
+	}
+
+	private void prepareLegacySelection(final ResourcePools<PoolKey, T> cluster) {
+		try {
+			cluster.prepareSelection(null);
+		} catch (InterruptedException interrupted) {
+			Thread.currentThread().interrupt();
+			throw new IllegalStateException("Cluster registration interrupted", interrupted);
+		}
 	}
 
 	@SuppressWarnings("unchecked")
-	@NotNull
-	private LoadBalancingStrategy<ResourcePool<PoolKey, T>, Collection<ResourcePool<PoolKey, T>>> getLoadBalancingStrategy(final ClusterKey clusterKey) {
-		return getClusterConfig(clusterKey).getLoadBalancingStrategy();
+	private LoadBalancingStrategy<ResourcePool<PoolKey, T>, Collection<ResourcePool<PoolKey, T>>> getLoadBalancingStrategy(final ClusterKey key) {
+		return getClusterConfig(key).getLoadBalancingStrategy();
 	}
 }

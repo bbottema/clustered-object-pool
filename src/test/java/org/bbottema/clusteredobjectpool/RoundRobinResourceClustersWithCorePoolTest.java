@@ -32,6 +32,8 @@ public class RoundRobinResourceClustersWithCorePoolTest extends RoundRobinResour
 		clusters.registerResourcePool(new ResourceClusterAndPoolKey<>(keyCluster2, "server_C"));
 		clusters.registerResourcePool(new ResourceClusterAndPoolKey<>(keyCluster2, "server_D"));
 		clusters.registerResourcePool(new ResourceClusterAndPoolKey<>(keyCluster3, "server_E"));
+		// Exact FIFO resource identities below assume background core prefill has completed.
+		assertThat(waitUntilAllocated(20, 2000)).isTrue();
 		
 		// first claim on a few specific servers
 		PoolableObject<String> connectionA1 = clusters.claimResourceFromPool(new ResourceClusterAndPoolKey<>(keyCluster1, "server_A"));

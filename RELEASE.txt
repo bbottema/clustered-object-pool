@@ -4,6 +4,15 @@ https://github.com/bbottema/clustered-object-pool
 RELEASE NOTES clustered-object-pool
 
 
+v4.1.0 (8 September 2026)
+
+- #25: Add opt-in ClaimOptions overloads for keyed, load-balanced and matching acquisition, reusing Generic Object Pool 2.5.0's cancellation control and total budget (bbottema/generic-object-pool#22).
+- #25: Keep one deadline through registration, selection and allocation; configured cluster limits can shorten but never restart the caller's budget.
+- #25: Share concurrent first registrations, separate application callbacks from registry bookkeeping, and include late initialization in shutdown.
+- #25: Preserve underlying shutdown failures instead of masking them in a nested future.
+- Existing claim methods, allocator factories, Java 8 baseline and JPMS automatic module names remain supported. No failover is added.
+
+
 v4.0.4 (7 September 2026)
 
 - #22: Update generic-object-pool to 2.4.3 so waiting keyed and load-balanced claims recover after invalidation or core-pool replenishment; also inherit atomic invalidation and shutdown cleanup fixes (bbottema/generic-object-pool#20).
