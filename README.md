@@ -1,6 +1,6 @@
 [![APACHE v2 License](https://img.shields.io/badge/license-apachev2-blue.svg?style=flat)](LICENSE-2.0.txt) 
 [![Latest Release](https://img.shields.io/maven-central/v/com.github.bbottema/clustered-object-pool.svg?style=flat)](http://search.maven.org/#search%7Cgav%7C1%7Cg%3A%22com.github.bbottema%22%20AND%20a%3A%22clustered-object-pool%22) 
-[![Javadocs](https://img.shields.io/badge/javadoc-4.0.1-brightgreen.svg?color=brightgreen)](https://www.javadoc.io/doc/com.github.bbottema/clustered-object-pool)
+[![Javadocs](https://img.shields.io/badge/javadoc-4.1.0-brightgreen.svg?color=brightgreen)](https://www.javadoc.io/doc/com.github.bbottema/clustered-object-pool)
 [![Codacy](https://img.shields.io/codacy/grade/7a0dc698534d4c9eb459709f7c3fbfe5.svg?style=flat)](https://www.codacy.com/app/b-bottema/clustered-object-pool)
 
 # clustered-object-pool
@@ -16,7 +16,7 @@ Maven Dependency Setup
 <dependency>
 	<groupId>com.github.bbottema</groupId>
 	<artifactId>clustered-object-pool</artifactId>
-	<version>4.0.4</version>
+	<version>4.1.0</version>
 </dependency>
 ```
 
@@ -25,9 +25,11 @@ For JPMS applications, the published JAR declares the stable automatic module na
 
 ## Release Notes
 
-4.0.4 (7 September 2026)
+4.1.0 (8 September 2026)
 
-- [#22](https://github.com/bbottema/clustered-object-pool/issues/22): Update `generic-object-pool` to 2.4.3 so waiting keyed and load-balanced claims recover after invalidation or core-pool replenishment. The update also protects concurrent invalidation and shutdown cleanup; Java 8 and the public API are unchanged.
+- [#25](https://github.com/bbottema/clustered-object-pool/issues/25): Opt into cancellation and a total acquisition budget on keyed, load-balanced and matching claims, using Generic Object Pool 2.5.0's `ClaimOptions` and `ClaimControl`.
+- Concurrent first claims share registration. Slow factories and load-balancing callbacks do not hold registry bookkeeping; shutdown includes registrations still finishing.
+- Existing claim methods, allocator factories, Java 8 support and module names remain supported. Load balancing still selects one pool, without failover.
 
 4.0.1
 
@@ -107,6 +109,45 @@ clusters.registerResourcePool(new ResourceClusterAndPoolKey<>(keyCluster2, Sessi
 ```
 
 Pools registered for `keyCluster2` now use the cluster-specific defaults. Other clusters still use the global defaults from the `ResourceClusters` constructor unless they are registered with their own config.
+
+#### Optional cancellation and an acquisition budget
+
+A stopped job can stop waiting for a resource without shutting down shared pools. Keep one control in the job and
+pass immutable options to its worker:
+
+```java
+ClaimControl claimControl = new ClaimControl();
+ClaimOptions options = ClaimOptions.withTimeout(30, TimeUnit.SECONDS)
+    .withClaimControl(claimControl);
+
+// On the worker; this call still blocks normally.
+PoolableObject<Transport> resource = clusters.claimResourceFromPool(
+    new ResourceClusterAndPoolKey<>(keyCluster1, SessionForServerA), options);
+// Or: clusters.claimResourceFromCluster(keyCluster1, options).
+// Matching-only: clusters.claimMatchingResourceFromPool(key, predicate, options).
+
+// From the job's stop handler on another thread:
+claimControl.requestCancellation();
+```
+
+Creating a control does not cancel anything. An explicit request produces `CancellationException`, an expired budget
+returns `null`, and thread interruption remains `InterruptedException`. Release or invalidate a returned resource as
+usual: cancellation of acquisition does not revoke it after handoff.
+
+One monotonic budget covers registration, selection, waiting and resource preparation. A configured cluster claim
+timeout can shorten that budget, never extend it. Existing overloads keep their configured legacy wait semantics.
+Matching never creates a cluster, registers a pool or initializes an unfinished registration.
+
+Factories and load-balancing callbacks still run on the calling thread. Library-owned lock waits are cancellable;
+arbitrary application callbacks need cooperation and may outlast the budget. Load-balancing callbacks remain
+serialized, separately from registry bookkeeping. Once a shared pool's initialization has begun, it belongs to the
+pool, not its first caller: cancelling that caller does not remove a neighbour's registration or core resources.
+Shutdown tracks late initialization and its disposal; registrations made after retirement are new work.
+
+Allocator factories are unchanged. An allocator can optionally override `allocate(AllocationContext)` and
+`allocateForReuse(resource, AllocationContext)` to observe the same request and remaining budget. See
+[Generic Object Pool's cancellation and cleanup contract](https://github.com/bbottema/generic-object-pool/tree/2.5.0#optional-cancellation-and-a-total-acquisition-budget)
+for cooperative abort hooks and `getDisposalCompletion()`.
 
 #### Idle maintenance
 
