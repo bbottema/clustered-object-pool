@@ -4,6 +4,12 @@ https://github.com/bbottema/clustered-object-pool
 RELEASE NOTES clustered-object-pool
 
 
+v4.1.1 (17 September 2026)
+
+- #27: Update generic-object-pool to 2.5.1 so creation-age and last-allocation expiration policies with matching thresholds or randomized bounds remain distinct in combined policies and keep separate expiry state (bbottema/generic-object-pool#24, bbottema/generic-object-pool#25).
+- Matching configurations of the same policy type retain value equality. Existing clustered APIs, Java 8 baseline and JPMS automatic module names remain unchanged.
+
+
 v4.1.0 (8 September 2026)
 
 - #25: Add opt-in ClaimOptions overloads for keyed, load-balanced and matching acquisition, reusing Generic Object Pool 2.5.0's cancellation control and total budget (bbottema/generic-object-pool#22).

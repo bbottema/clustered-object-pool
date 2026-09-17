@@ -1,6 +1,6 @@
 [![APACHE v2 License](https://img.shields.io/badge/license-apachev2-blue.svg?style=flat)](LICENSE-2.0.txt) 
 [![Latest Release](https://img.shields.io/maven-central/v/com.github.bbottema/clustered-object-pool.svg?style=flat)](http://search.maven.org/#search%7Cgav%7C1%7Cg%3A%22com.github.bbottema%22%20AND%20a%3A%22clustered-object-pool%22) 
-[![Javadocs](https://img.shields.io/badge/javadoc-4.1.0-brightgreen.svg?color=brightgreen)](https://www.javadoc.io/doc/com.github.bbottema/clustered-object-pool)
+[![Javadocs](https://img.shields.io/badge/javadoc-4.1.1-brightgreen.svg?color=brightgreen)](https://www.javadoc.io/doc/com.github.bbottema/clustered-object-pool)
 [![Codacy](https://img.shields.io/codacy/grade/7a0dc698534d4c9eb459709f7c3fbfe5.svg?style=flat)](https://www.codacy.com/app/b-bottema/clustered-object-pool)
 
 # clustered-object-pool
@@ -16,7 +16,7 @@ Maven Dependency Setup
 <dependency>
 	<groupId>com.github.bbottema</groupId>
 	<artifactId>clustered-object-pool</artifactId>
-	<version>4.1.0</version>
+	<version>4.1.1</version>
 </dependency>
 ```
 
@@ -25,11 +25,10 @@ For JPMS applications, the published JAR declares the stable automatic module na
 
 ## Release Notes
 
-4.1.0 (8 September 2026)
+4.1.1 (17 September 2026)
 
-- [#25](https://github.com/bbottema/clustered-object-pool/issues/25): Opt into cancellation and a total acquisition budget on keyed, load-balanced and matching claims, using Generic Object Pool 2.5.0's `ClaimOptions` and `ClaimControl`.
-- Concurrent first claims share registration. Slow factories and load-balancing callbacks do not hold registry bookkeeping; shutdown includes registrations still finishing.
-- Existing claim methods, allocator factories, Java 8 support and module names remain supported. Load balancing still selects one pool, without failover.
+- [#27](https://github.com/bbottema/clustered-object-pool/issues/27): Update Generic Object Pool to [2.5.1](https://github.com/bbottema/generic-object-pool/releases/tag/2.5.1), fixing creation-age and last-allocation policies with matching thresholds or randomized bounds so combined policies retain both rules and keep separate expiry state ([upstream #24](https://github.com/bbottema/generic-object-pool/issues/24)).
+- Matching configurations of the same policy type remain equal. Existing clustered APIs, Java 8 support and automatic module names remain unchanged.
 
 4.0.1
 
