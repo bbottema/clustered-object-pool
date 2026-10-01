@@ -136,6 +136,50 @@ public class ResourceClusters<ClusterKey, PoolKey, T> {
 	}
 
 	/**
+	 * Selects which registered pool will supply a resource, using the cluster's load balancer without borrowing a resource yet.
+	 *
+	 * <p>Use this when your application needs to know the selected pool before doing other work, such as loading
+	 * destination-specific configuration. Inspect {@link ResourcePoolSelection#getPoolKey() the selected pool's key},
+	 * perform that work, then call {@link ResourcePoolSelection#claim()} when ready. No resource is held on your behalf
+	 * during the intervening work; the pool does not perform or manage that work.</p>
+	 *
+	 * <p>Selection does not reserve capacity. If you are ready to borrow immediately, use
+	 * {@link #claimResourceFromCluster(Object)} to select and acquire in one call.</p>
+	 *
+	 * <p>This method does not register or initialize a pool. Selection uses the configured cluster timeout; the returned
+	 * selection can later claim from that same registration. An unknown or empty cluster throws {@link IllegalStateException};
+	 * a timeout returns null.</p>
+	 */
+	@Nullable
+	public ResourcePoolSelection<PoolKey, T> selectPoolFromCluster(final ClusterKey key) throws InterruptedException {
+		return selectPoolFromCluster(key, ClaimOptions.withoutTimeout());
+	}
+
+	/**
+	 * Cancellable, time-bounded counterpart of {@link #selectPoolFromCluster(Object)}. The cluster timeout can shorten
+	 * the supplied budget. A running application load-balancing callback must return cooperatively before cancellation
+	 * or timeout can be reported. Subsequent acquisition has its own budget; see {@link ResourcePoolSelection#claim(ClaimOptions)}.
+	 */
+	@Nullable
+	public ResourcePoolSelection<PoolKey, T> selectPoolFromCluster(final ClusterKey key, @NotNull final ClaimOptions options)
+			throws InterruptedException {
+		final AllocationContext context = startClaim(key, options);
+		if (context == null) {
+			return null;
+		}
+		final ResourcePools<PoolKey, T> cluster = findCluster(key, context);
+		if (!ClaimBudget.active(context)) {
+			return null;
+		}
+		if (cluster == null) {
+			throw new IllegalStateException("Register a pool before selecting from this cluster");
+		}
+		final ResourcePool<PoolKey, T> selected = cluster.cycle(getLoadBalancingStrategy(key), context);
+		return selected == null || !ClaimBudget.active(context) ? null
+				: new ResourcePoolSelection<>(selected, getClusterConfig(key).getClaimTimeout());
+	}
+
+	/**
 	 * Selects one pool and acquires a resource with optional cancellation and one total budget. The configured cluster
 	 * timeout can shorten, but never extend, the caller's budget. Returns null on timeout; cancellation throws
 	 * {@link java.util.concurrent.CancellationException}. A running application callback must return cooperatively.
@@ -154,6 +198,39 @@ public class ResourceClusters<ClusterKey, PoolKey, T> {
 		}
 		final ResourcePool<PoolKey, T> selected = cluster.cycle(getLoadBalancingStrategy(key), context);
 		return selected == null || !ClaimBudget.active(context) ? null : selected.claim(context);
+	}
+
+	/**
+	 * Addressed counterpart of {@link #selectPoolFromCluster(Object)}: selects an already registered pool without
+	 * running the load balancer, initializing the pool or allocating a resource. Unlike an addressed claim, this method
+	 * never registers a missing pool. Missing registrations throw {@link IllegalStateException}.
+	 * If you are ready to borrow immediately, use {@link #claimResourceFromPool(ResourceKey)} instead.
+	 */
+	@Nullable
+	public ResourcePoolSelection<PoolKey, T> selectPool(final ResourceKey<ClusterKey, PoolKey> key) throws InterruptedException {
+		return selectPool(key, ClaimOptions.withoutTimeout());
+	}
+
+	/**
+	 * Cancellable, time-bounded counterpart of {@link #selectPool(ResourceKey)}. Returns null on timeout;
+	 * cancellation throws {@link java.util.concurrent.CancellationException}. Subsequent acquisition starts a new budget.
+	 */
+	@Nullable
+	public ResourcePoolSelection<PoolKey, T> selectPool(final ResourceKey<ClusterKey, PoolKey> key, @NotNull final ClaimOptions options)
+			throws InterruptedException {
+		final AllocationContext context = startClaim(key.getClusterKey(), options);
+		if (context == null) {
+			return null;
+		}
+		final ResourcePools<PoolKey, T> cluster = findCluster(key.getClusterKey(), context);
+		final ResourcePool<PoolKey, T> selected = cluster == null ? null : cluster.findResourcePool(key.getPoolKey(), context);
+		if (!ClaimBudget.active(context)) {
+			return null;
+		}
+		if (selected == null) {
+			throw new IllegalStateException("Register this pool before selecting it");
+		}
+		return new ResourcePoolSelection<>(selected, getClusterConfig(key.getClusterKey()).getClaimTimeout());
 	}
 
 	/** Claims from the specified pool, registering it once if needed, using the legacy configured wait timeout. */
@@ -302,6 +379,17 @@ public class ResourceClusters<ClusterKey, PoolKey, T> {
 
 	private ResourcePools<PoolKey, T> findCluster(final ClusterKey key) {
 		registryLock.lock();
+		try {
+			return resourceClusters.get(key);
+		} finally {
+			registryLock.unlock();
+		}
+	}
+
+	private ResourcePools<PoolKey, T> findCluster(final ClusterKey key, final AllocationContext context) throws InterruptedException {
+		if (!ClaimBudget.acquire(registryLock, context)) {
+			return null;
+		}
 		try {
 			return resourceClusters.get(key);
 		} finally {
