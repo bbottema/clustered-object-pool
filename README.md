@@ -1,6 +1,6 @@
 [![APACHE v2 License](https://img.shields.io/badge/license-apachev2-blue.svg?style=flat)](LICENSE-2.0.txt) 
 [![Latest Release](https://img.shields.io/maven-central/v/com.github.bbottema/clustered-object-pool.svg?style=flat)](http://search.maven.org/#search%7Cgav%7C1%7Cg%3A%22com.github.bbottema%22%20AND%20a%3A%22clustered-object-pool%22) 
-[![Javadocs](https://img.shields.io/badge/javadoc-4.1.1-brightgreen.svg?color=brightgreen)](https://www.javadoc.io/doc/com.github.bbottema/clustered-object-pool)
+[![Javadocs](https://img.shields.io/badge/javadoc-4.2.0-brightgreen.svg?color=brightgreen)](https://www.javadoc.io/doc/com.github.bbottema/clustered-object-pool)
 [![Codacy](https://img.shields.io/codacy/grade/7a0dc698534d4c9eb459709f7c3fbfe5.svg?style=flat)](https://www.codacy.com/app/b-bottema/clustered-object-pool)
 
 # clustered-object-pool
@@ -16,7 +16,7 @@ Maven Dependency Setup
 <dependency>
 	<groupId>com.github.bbottema</groupId>
 	<artifactId>clustered-object-pool</artifactId>
-	<version>4.1.1</version>
+	<version>4.2.0</version>
 </dependency>
 ```
 
@@ -24,6 +24,11 @@ For JPMS applications, the published JAR declares the stable automatic module na
 `org.bbottema.clusteredobjectpool`.
 
 ## Release Notes
+
+4.2.0 (1 October 2026)
+
+- [#29](https://github.com/bbottema/clustered-object-pool/issues/29): Select a registered pool, finish application work that depends on its key, then borrow a resource from that same registration. Selection does not allocate a resource or reserve capacity.
+- Existing combined claim methods, Java 8 support and automatic module names remain unchanged. Both selection and the later claim support the existing cancellation and timeout controls, with separate budgets.
 
 4.1.1 (17 September 2026)
 
@@ -257,3 +262,34 @@ Future<?> shutdownFuture = clusters.shutDown(PoolKey);
 
 shutdownFuture.get(); // blocks until all relevant pools have shut down
 ```
+
+## Selecting before claiming
+
+Usually, `claimResourceFromCluster(...)` selects a pool and borrows a resource in one call. You can now separate those steps when
+your application needs to know the destination before doing other work, such as loading configuration for the selected pool.
+Select first, do that work, then claim when ready. No resource is held on your behalf in between.
+
+This example shows acquisition only. `prepareForDestination(...)` represents your application's work, not a pool-library method:
+
+```java
+ResourcePoolSelection<String, Connection> selected = clusters.selectPoolFromCluster("cluster", claimOptions);
+if (selected == null) {
+    throw new TimeoutException("Timed out selecting a pool");
+}
+prepareForDestination(selected.getPoolKey());
+PoolableObject<Connection> resource = selected.claim(claimOptions);
+if (resource == null) {
+    throw new TimeoutException("Timed out acquiring a resource from the selected pool");
+}
+// Use, release or invalidate resource as before.
+```
+
+Register the pools first. Selection uses the existing load balancer but does not initialize a pool or allocate a resource.
+Check for `null` on timeout, as with ordinary clustered claims. Addressed selection is available through `selectPool(key, claimOptions)`.
+The selection stays bound to that registration: shutting it down makes later claims fail, even if its key is registered again.
+It reserves no capacity, keeps no pool alive, and does not need closing. The claimed resource still needs release or invalidation.
+The pool does not perform or manage your intervening work. If you are ready to borrow immediately, keep using the combined claim method.
+
+Selection and acquisition each start a timeout budget capped by the configured cluster timeout. Time spent between them is application
+work; supply the remaining application deadline when claiming if both operations must share one total deadline. Existing combined claim
+methods are unchanged. See [#29](https://github.com/bbottema/clustered-object-pool/issues/29).
