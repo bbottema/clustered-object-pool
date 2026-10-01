@@ -222,6 +222,17 @@ final class ResourcePools<PoolKey, T> {
 		}
 	}
 
+	ResourcePool<PoolKey, T> findResourcePool(final PoolKey key, final AllocationContext context) throws InterruptedException {
+		if (!ClaimBudget.acquire(registryLock, context)) {
+			return null;
+		}
+		try {
+			return pools.get(key);
+		} finally {
+			registryLock.unlock();
+		}
+	}
+
 	private List<ResourcePool<PoolKey, T>> snapshot() {
 		registryLock.lock();
 		try {

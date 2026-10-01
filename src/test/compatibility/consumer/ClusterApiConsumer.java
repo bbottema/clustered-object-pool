@@ -2,6 +2,7 @@ package consumer;
 
 import org.bbottema.clusteredobjectpool.core.ClusterConfig;
 import org.bbottema.clusteredobjectpool.core.ResourceClusters;
+import org.bbottema.clusteredobjectpool.core.ResourcePoolSelection;
 import org.bbottema.clusteredobjectpool.core.api.ResourceKey.ResourceClusterAndPoolKey;
 import org.bbottema.genericobjectpool.AllocationContext;
 import org.bbottema.genericobjectpool.Allocator;
@@ -28,6 +29,11 @@ public final class ClusterApiConsumer {
 			}
 			control.requestCancellation();
 			resource.release();
+			final ResourcePoolSelection<String, String> selected = clusters.selectPoolFromCluster("cluster", ClaimOptions.withoutTimeout());
+			if (!"pool".equals(selected.getPoolKey())) {
+				throw new AssertionError("Selected the wrong pool");
+			}
+			selected.claim(ClaimOptions.withoutTimeout()).release();
 		} finally {
 			clusters.shutDown().get(5, TimeUnit.SECONDS);
 		}

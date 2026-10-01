@@ -3,6 +3,12 @@ https://github.com/bbottema/clustered-object-pool
 
 RELEASE NOTES clustered-object-pool
 
+v4.2.0 (1 October 2026)
+
+- #29: Select a registered pool before borrowing a resource, using the existing load balancer and cancellation controls.
+  The selection remains tied to its original registration across shutdown/re-registration. Existing claim APIs are unchanged.
+- Selection does not allocate resources or reserve capacity. Selection and acquisition have separate timeout budgets.
+  Java 8 support, generic-object-pool 2.5.1 and JPMS automatic module names remain unchanged.
 
 v4.1.1 (17 September 2026)
 
