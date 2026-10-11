@@ -59,6 +59,22 @@ class ResourcePoolSelectionTest {
 	}
 
 	@Test
+	void candidateTraversalIsFiniteAndDoesNotAdvanceOrdinarySelectionForEveryAlternative() throws Exception {
+		final ResourceClusters<String, String, String> clusters = clusters(strategy());
+		register(clusters, "one", "two", "three");
+		final List<ResourcePoolSelection<String, String>> candidates = clusters.selectPoolCandidates("cluster");
+		assertThat(candidates).extracting(ResourcePoolSelection::getPoolKey).containsExactly("one", "two", "three");
+		assertThat(allocations.get()).isZero();
+		assertThatThrownBy(() -> candidates.clear()).isInstanceOf(UnsupportedOperationException.class);
+		assertThat(clusters.selectPoolFromCluster("cluster").getPoolKey()).isEqualTo("two");
+		clusters.shutdownPool("two").get(5, SECONDS);
+		register(clusters, "two", "four");
+		assertThat(candidates).hasSize(3);
+		assertThatThrownBy(candidates.get(1)::claim).isInstanceOf(IllegalStateException.class).hasMessageContaining("retired");
+		assertClaim(candidates.get(2), "three");
+	}
+
+	@Test
 	void missingSelectionNeverRegistersAnything() {
 		final ResourceClusters<String, String, String> clusters = clusters(strategy());
 		assertThatThrownBy(() -> clusters.selectPoolFromCluster("missing")).isInstanceOf(IllegalStateException.class);

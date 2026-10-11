@@ -3,6 +3,14 @@ https://github.com/bbottema/clustered-object-pool
 
 RELEASE NOTES clustered-object-pool
 
+v4.3.0 (unreleased)
+
+- #31: List the pools an application can consider with selectPoolCandidates(...), for example to consider another destination after a connection failure.
+  The immutable list contains each captured registration once and uses the configured load-balancing strategy.
+  Selection borrows no resource. Retirement does not substitute a new registration, and only the first selection advances the shared load-balancing position.
+  Failure classification and retries remain the caller's responsibility; normal one-pool selection and claims are unchanged.
+- Uses generic-object-pool 2.6.0-SNAPSHOT for local verification. Java 8 and existing APIs remain supported. This version is not published yet.
+
 v4.2.0 (1 October 2026)
 
 - #29: Select a registered pool before borrowing a resource, using the existing load balancer and cancellation controls.

@@ -25,6 +25,12 @@ For JPMS applications, the published JAR declares the stable automatic module na
 
 ## Release Notes
 
+4.3.0 (unreleased)
+
+- [#31](https://github.com/bbottema/clustered-object-pool/issues/31): `selectPoolCandidates(...)` lists the pools your application can consider without borrowing resources. For example, consider another service destination after a connection failure. The immutable list includes each captured registration once; the application decides whether to try another. See [Considering another destination](#considering-another-destination).
+- Normal one-pool selection remains unchanged. Only the first candidate advances the shared load-balancing position; alternatives are ordered privately. The caller still owns failure classification and any retry policy.
+- Uses the unpublished Generic Object Pool 2.6.0 snapshot during local verification. Existing APIs and Java 8 remain supported.
+
 4.2.0 (1 October 2026)
 
 - [#29](https://github.com/bbottema/clustered-object-pool/issues/29): Select a registered pool, finish application work that depends on its key, then borrow a resource from that same registration. Selection does not allocate a resource or reserve capacity.
@@ -293,3 +299,41 @@ The pool does not perform or manage your intervening work. If you are ready to b
 Selection and acquisition each start a timeout budget capped by the configured cluster timeout. Time spent between them is application
 work; supply the remaining application deadline when claiming if both operations must share one total deadline. Existing combined claim
 methods are unchanged. See [#29](https://github.com/bbottema/clustered-object-pool/issues/29).
+
+## Considering another destination
+
+Use `selectPoolCandidates(...)` when your application needs a list of destinations it can consider rather than just one.
+For example, a service client might try another destination if opening a connection fails. The pool supplies the ordering;
+your application still decides which failures permit moving on. It does not retry your requests.
+
+Like the single-selection API, this requires already registered pools. This example selects the list, inspects the first
+destination, then borrows from it. `prepareForDestination(...)` is application code, not a library method:
+
+```java
+List<ResourcePoolSelection<String, Connection>> candidates = clusters.selectPoolCandidates("cluster", claimOptions);
+if (candidates == null) {
+    throw new TimeoutException("Timed out selecting destinations");
+}
+
+ResourcePoolSelection<String, Connection> selected = candidates.get(0);
+prepareForDestination(selected.getPoolKey());
+PoolableObject<Connection> resource = selected.claim(claimOptions);
+if (resource == null) {
+    throw new TimeoutException("Timed out borrowing from the selected pool");
+}
+// Use, release or invalidate resource as before.
+```
+
+If acquisition fails in a way your application knows permits another destination, consider the next selection from this
+same list. Do not automatically move on for every exception: normal waiting for a busy pool, cancellation and an expired
+application deadline are different from a failed service. Once application work begins, deciding whether to repeat that
+work is also your responsibility.
+
+The returned list is immutable and contains each captured registration once. The first follows normal load balancing;
+alternatives use the same strategy without advancing the shared selection position for every possible fallback. Pools
+registered later do not appear in the list. Re-registering a key does not redirect an old selection to the new pool.
+
+Capturing this list neither initializes pools nor borrows resources or reserves capacity. Selections do not need closing;
+resources claimed from them still need release or invalidation. Selection and each claim have separate timeout budgets,
+so pass your remaining application budget when claiming if the complete operation has one deadline. Existing combined
+claim APIs are unchanged. This API is part of the unreleased 4.3.0 work; see [#31](https://github.com/bbottema/clustered-object-pool/issues/31).

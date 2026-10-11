@@ -90,6 +90,73 @@ final class ResourcePools<PoolKey, T> {
 		}
 	}
 
+	/** Advances the shared strategy once, then orders a private remainder while excluding every already selected registration. */
+	List<ResourcePool<PoolKey, T>> candidates(
+			final LoadBalancingStrategy<ResourcePool<PoolKey, T>, Collection<ResourcePool<PoolKey, T>>> strategy,
+			final AllocationContext context) throws InterruptedException {
+		if (!prepareSelection(context) || !ClaimBudget.acquire(selectionLock, context)) {
+			return null;
+		}
+		try {
+			if (!ClaimBudget.active(context)) {
+				return null;
+			}
+			reconcileSelection();
+			if (clusterCollection.isEmpty()) {
+				throw new IllegalStateException("Cluster contains no pools to draw from");
+			}
+			return orderCapturedCandidates(strategy, context);
+		} finally {
+			selectionLock.unlock();
+		}
+	}
+
+	private List<ResourcePool<PoolKey, T>> orderCapturedCandidates(
+			final LoadBalancingStrategy<ResourcePool<PoolKey, T>, Collection<ResourcePool<PoolKey, T>>> strategy,
+			final AllocationContext context) throws InterruptedException {
+		final List<ResourcePool<PoolKey, T>> captured = new ArrayList<>(clusterCollection);
+		final ResourcePool<PoolKey, T> first = strategy.cycle(clusterCollection);
+		if (!captured.remove(first)) {
+			throw new IllegalStateException("The load-balancing strategy selected a pool outside the supplied collection");
+		}
+		final List<ResourcePool<PoolKey, T>> ordered = new ArrayList<>();
+		ordered.add(first);
+		final Collection<ResourcePool<PoolKey, T>> remaining = privateCandidateCollection(strategy, captured);
+		while (!captured.isEmpty()) {
+			if (!ClaimBudget.active(context)) {
+				return null;
+			}
+			final ResourcePool<PoolKey, T> next = strategy.cycle(remaining);
+			if (!captured.remove(next)) {
+				throw new IllegalStateException("The load-balancing strategy selected an already visited or unknown pool");
+			}
+			ordered.add(next);
+			reconcileRemainingCandidates(remaining, captured);
+		}
+		return ordered;
+	}
+
+	private Collection<ResourcePool<PoolKey, T>> privateCandidateCollection(
+			final LoadBalancingStrategy<ResourcePool<PoolKey, T>, Collection<ResourcePool<PoolKey, T>>> strategy,
+			final List<ResourcePool<PoolKey, T>> captured) {
+		final Collection<ResourcePool<PoolKey, T>> remaining = strategy.createCollectionForCycling();
+		if (remaining == clusterCollection || !remaining.isEmpty()) {
+			throw new IllegalStateException("Candidate traversal needs createCollectionForCycling() to return a new, empty collection");
+		}
+		remaining.addAll(captured);
+		return remaining;
+	}
+
+	private void reconcileRemainingCandidates(final Collection<ResourcePool<PoolKey, T>> remaining, final List<ResourcePool<PoolKey, T>> captured) {
+		// A strategy may rotate or remove its selection; reconstruct only the still-eligible registrations.
+		remaining.retainAll(captured);
+		for (ResourcePool<PoolKey, T> candidate : captured) {
+			if (!remaining.contains(candidate)) {
+				remaining.add(candidate);
+			}
+		}
+	}
+
 	ResourcePool<PoolKey, T> register(final PoolKey key, final Supplier<GenericObjectPool<T>> factory,
 			final boolean failIfExists, final AllocationContext context) throws InterruptedException {
 		if (!ClaimBudget.acquire(registryLock, context)) {

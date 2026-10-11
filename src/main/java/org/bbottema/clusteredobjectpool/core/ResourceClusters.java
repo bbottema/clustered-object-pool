@@ -16,6 +16,7 @@ import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -153,6 +154,59 @@ public class ResourceClusters<ClusterKey, PoolKey, T> {
 	@Nullable
 	public ResourcePoolSelection<PoolKey, T> selectPoolFromCluster(final ClusterKey key) throws InterruptedException {
 		return selectPoolFromCluster(key, ClaimOptions.withoutTimeout());
+	}
+
+	/**
+	 * Gives your application an ordered list of pools it can consider, without borrowing an object yet.
+	 * For example, a client can consider another service destination if opening a connection to the first one fails.
+	 * Your application decides which failures justify moving on; this library does not retry application work.
+	 * <p>
+	 * The list is immutable and contains each current pool registration once.
+	 * The first candidate uses the normal shared load-balancing position. Remaining candidates use the same strategy
+	 * on a private collection, excluding those already visited, so another operation's ordinary selection is not
+	 * advanced for each potential alternative. Later registration or replacement does not change this list.
+	 * A retired selection fails when claimed, rather than switching to its replacement.
+	 * <p>
+	 * No capacity is reserved, and a selection needs no cleanup. When ready, call
+	 * {@link ResourcePoolSelection#claim(ClaimOptions)} on the chosen candidate. Selection and claiming have separate
+	 * timeout budgets, capped by the configured cluster timeout; pass your remaining application budget when claiming
+	 * if both must fit one deadline. A busy pool is not necessarily a failed destination.
+	 *
+	 * @param key the cluster whose registered pools should be considered
+	 * @param options cancellation and timeout controls for selecting the list, not for subsequent claims
+	 * @return candidates in selection order, or null if the selection budget expires
+	 * @throws InterruptedException if the selection is interrupted
+	 * @since 4.3.0
+	 */
+	@Nullable
+	public List<ResourcePoolSelection<PoolKey, T>> selectPoolCandidates(final ClusterKey key, @NotNull final ClaimOptions options)
+			throws InterruptedException {
+		final AllocationContext context = startClaim(key, options);
+		if (context == null) {
+			return null;
+		}
+		final ResourcePools<PoolKey, T> cluster = findCluster(key, context);
+		if (!ClaimBudget.active(context)) {
+			return null;
+		}
+		if (cluster == null) {
+			throw new IllegalStateException("Register a pool before selecting from this cluster");
+		}
+		final List<ResourcePool<PoolKey, T>> candidates = cluster.candidates(getLoadBalancingStrategy(key), context);
+		if (candidates == null || !ClaimBudget.active(context)) {
+			return null;
+		}
+		final List<ResourcePoolSelection<PoolKey, T>> selections = new ArrayList<>();
+		for (final ResourcePool<PoolKey, T> candidate : candidates) {
+			selections.add(new ResourcePoolSelection<>(candidate, getClusterConfig(key).getClaimTimeout()));
+		}
+		return Collections.unmodifiableList(selections);
+	}
+
+	/** Lists the pools your application can consider, using the cluster's normal timeout; see {@link #selectPoolCandidates(Object, ClaimOptions)}. */
+	@Nullable
+	public List<ResourcePoolSelection<PoolKey, T>> selectPoolCandidates(final ClusterKey key) throws InterruptedException {
+		return selectPoolCandidates(key, ClaimOptions.withoutTimeout());
 	}
 
 	/**
