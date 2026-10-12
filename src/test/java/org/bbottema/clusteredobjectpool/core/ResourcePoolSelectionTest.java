@@ -3,6 +3,7 @@ package org.bbottema.clusteredobjectpool.core;
 import org.bbottema.clusteredobjectpool.core.api.ResourceKey.ResourceClusterAndPoolKey;
 import org.bbottema.clusteredobjectpool.cyclingstrategies.RoundRobinLoadBalancing;
 import org.bbottema.genericobjectpool.Allocator;
+import org.bbottema.genericobjectpool.AllocationContext;
 import org.bbottema.genericobjectpool.ClaimControl;
 import org.bbottema.genericobjectpool.ClaimOptions;
 import org.bbottema.genericobjectpool.PoolableObject;
@@ -19,6 +20,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static java.util.concurrent.TimeUnit.SECONDS;
@@ -31,6 +33,25 @@ class ResourcePoolSelectionTest {
 	private final List<ResourceClusters<String, String, String>> owned = new ArrayList<>();
 	private final AtomicInteger allocations = new AtomicInteger();
 	private final AtomicInteger selections = new AtomicInteger();
+	private final AtomicReference<AllocationContext> allocationContext = new AtomicReference<>();
+
+	@Test
+	void startedClaimKeepsItsIdentityAndDoesNotRestartAnExpiredBudget() throws Exception {
+		final ResourceClusters<String, String, String> clusters = clusters(strategy());
+		register(clusters, "one");
+		final ResourcePoolSelection<String, String> selected = clusters.selectPoolFromCluster("cluster");
+		assertThat(selected.claimWithContext(ClaimOptions.withTimeout(0, SECONDS).start())).isNull();
+		assertThat(allocations.get()).isZero();
+		final AllocationContext context = ClaimOptions.withoutTimeout().start();
+		final PoolableObject<String> claimed = selected.claimWithContext(context);
+		try {
+			assertThat(allocationContext.get().getClaimIdentity()).isSameAs(context.getClaimIdentity());
+			assertThat(allocationContext.get().getRemainingTime(SECONDS)).isLessThanOrEqualTo(5);
+			assertThat(selections.get()).isEqualTo(1);
+		} finally {
+			claimed.release();
+		}
+	}
 
 	@AfterEach
 	void close() throws Exception {
@@ -102,6 +123,7 @@ class ResourcePoolSelectionTest {
 		register(clusters, "one");
 		assertThatThrownBy(previous::claim).isInstanceOf(IllegalStateException.class).hasMessageContaining("retired");
 		assertThatThrownBy(() -> previous.claim(ClaimOptions.withoutTimeout())).isInstanceOf(IllegalStateException.class);
+		assertThatThrownBy(() -> previous.claimWithContext(ClaimOptions.withoutTimeout().start())).isInstanceOf(IllegalStateException.class);
 		assertThat(allocations.get()).isZero();
 		assertClaim(clusters.selectPoolFromCluster("cluster"), "one");
 	}
@@ -117,6 +139,7 @@ class ResourcePoolSelectionTest {
 		assertThatThrownBy(() -> clusters.selectPoolFromCluster("cluster", options)).isInstanceOf(CancellationException.class);
 		assertThatThrownBy(() -> clusters.selectPool(key("one"), options)).isInstanceOf(CancellationException.class);
 		assertThatThrownBy(() -> selected.claim(options)).isInstanceOf(CancellationException.class);
+		assertThatThrownBy(() -> selected.claimWithContext(options.start())).isInstanceOf(CancellationException.class);
 		assertThat(selections.get()).isEqualTo(1);
 		assertThat(allocations.get()).isZero();
 		assertClaim(selected, "one");
@@ -261,6 +284,11 @@ class ResourcePoolSelectionTest {
 					public String allocate() {
 						allocations.incrementAndGet();
 						return key.getPoolKey();
+					}
+					@Override
+					public String allocate(final AllocationContext context) {
+						allocationContext.set(context);
+						return allocate();
 					}
 				}).defaultMaxPoolSize(1).defaultExpirationPolicy(value -> false).loadBalancingStrategy(strategy)
 				.claimTimeout(new Timeout(5, SECONDS)).build());

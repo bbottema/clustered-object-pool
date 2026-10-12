@@ -48,7 +48,20 @@ public final class ResourcePoolSelection<PoolKey, T> {
 	 */
 	@Nullable
 	public PoolableObject<T> claim(@NotNull final ClaimOptions options) throws InterruptedException {
-		final AllocationContext context = requireNonNull(options, "options").start().limitedTo(claimTimeout);
-		return ClaimBudget.active(context) ? pool.claim(context) : null;
+		return claimWithContext(requireNonNull(options, "options").start());
+	}
+
+	/**
+	 * Continues a claim that another integration layer already started, without changing its identity or restarting
+	 * its timeout. The configured pool timeout can only shorten the budget. Selection stays pinned to this original
+	 * registration, including when another pool has since been registered with the same key.
+	 *
+	 * @return the borrowed resource, or {@code null} when the remaining budget expires
+	 * @since 4.3.0
+	 */
+	@Nullable
+	public PoolableObject<T> claimWithContext(@NotNull final AllocationContext context) throws InterruptedException {
+		final AllocationContext limited = requireNonNull(context, "context").limitedTo(claimTimeout);
+		return ClaimBudget.active(limited) ? pool.claim(limited) : null;
 	}
 }

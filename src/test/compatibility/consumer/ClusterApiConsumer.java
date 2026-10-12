@@ -34,6 +34,7 @@ public final class ClusterApiConsumer {
 				throw new AssertionError("Selected the wrong pool");
 			}
 			selected.claim(ClaimOptions.withoutTimeout()).release();
+			selected.claimWithContext(ClaimOptions.withoutTimeout().start()).release();
 		} finally {
 			clusters.shutDown().get(5, TimeUnit.SECONDS);
 		}
