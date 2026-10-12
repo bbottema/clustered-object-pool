@@ -1,6 +1,6 @@
 [![APACHE v2 License](https://img.shields.io/badge/license-apachev2-blue.svg?style=flat)](LICENSE-2.0.txt) 
 [![Latest Release](https://img.shields.io/maven-central/v/com.github.bbottema/clustered-object-pool.svg?style=flat)](http://search.maven.org/#search%7Cgav%7C1%7Cg%3A%22com.github.bbottema%22%20AND%20a%3A%22clustered-object-pool%22) 
-[![Javadocs](https://img.shields.io/badge/javadoc-4.2.0-brightgreen.svg?color=brightgreen)](https://www.javadoc.io/doc/com.github.bbottema/clustered-object-pool)
+[![Javadocs](https://img.shields.io/badge/javadoc-4.3.0-brightgreen.svg?color=brightgreen)](https://www.javadoc.io/doc/com.github.bbottema/clustered-object-pool)
 [![Codacy](https://img.shields.io/codacy/grade/7a0dc698534d4c9eb459709f7c3fbfe5.svg?style=flat)](https://www.codacy.com/app/b-bottema/clustered-object-pool)
 
 # clustered-object-pool
@@ -16,7 +16,7 @@ Maven Dependency Setup
 <dependency>
 	<groupId>com.github.bbottema</groupId>
 	<artifactId>clustered-object-pool</artifactId>
-	<version>4.2.0</version>
+	<version>4.3.0</version>
 </dependency>
 ```
 
@@ -25,11 +25,12 @@ For JPMS applications, the published JAR declares the stable automatic module na
 
 ## Release Notes
 
-4.3.0 (unreleased)
+4.3.0 (12 October 2026)
 
 - [#31](https://github.com/bbottema/clustered-object-pool/issues/31): `selectPoolCandidates(...)` lists the pools your application can consider without borrowing resources. For example, consider another service destination after a connection failure. The immutable list includes each captured registration once; the application decides whether to try another. See [Considering another destination](#considering-another-destination).
 - Normal one-pool selection remains unchanged. Only the first candidate advances the shared load-balancing position; alternatives are ordered privately. The caller still owns failure classification and any retry policy.
-- Uses the unpublished Generic Object Pool 2.6.0 snapshot during local verification. Existing APIs and Java 8 remain supported.
+- `ResourcePoolSelection.claimWithContext(...)` continues an acquisition started by another integration layer, preserving its identity, cancellation and elapsed budget.
+- Uses Generic Object Pool 2.6.0. Existing APIs, Java 8 and automatic module names remain supported.
 
 4.2.0 (1 October 2026)
 
@@ -293,6 +294,12 @@ if (resource == null) {
 Register the pools first. Selection uses the existing load balancer but does not initialize a pool or allocate a resource.
 Check for `null` on timeout, as with ordinary clustered claims. Addressed selection is available through `selectPool(key, claimOptions)`.
 The selection stays bound to that registration: shutting it down makes later claims fail, even if its key is registered again.
+
+If another integration layer has already started the acquisition budget, use `selected.claimWithContext(context)`.
+It preserves `context.getClaimIdentity()`, cancellation and elapsed time while capping the budget by the configured
+cluster timeout. For example, an allocator callback can use that identity to find the caller's metrics or tracing context.
+Do not start another context for the same claim; start a fresh one for an independent claim. Existing `claim(options)`
+still starts its budget at the call, and a pinned selection never redirects to a replacement registration.
 It reserves no capacity, keeps no pool alive, and does not need closing. The claimed resource still needs release or invalidation.
 The pool does not perform or manage your intervening work. If you are ready to borrow immediately, keep using the combined claim method.
 
@@ -336,4 +343,4 @@ registered later do not appear in the list. Re-registering a key does not redire
 Capturing this list neither initializes pools nor borrows resources or reserves capacity. Selections do not need closing;
 resources claimed from them still need release or invalidation. Selection and each claim have separate timeout budgets,
 so pass your remaining application budget when claiming if the complete operation has one deadline. Existing combined
-claim APIs are unchanged. This API is part of the unreleased 4.3.0 work; see [#31](https://github.com/bbottema/clustered-object-pool/issues/31).
+claim APIs are unchanged. These APIs are available from 4.3.0; see [#31](https://github.com/bbottema/clustered-object-pool/issues/31).

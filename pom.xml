@@ -12,14 +12,14 @@
 	<artifactId>clustered-object-pool</artifactId>
 	<packaging>jar</packaging>
 	<name>clustered-object-pool</name>
-	<version>4.3.0-SNAPSHOT</version>
+	<version>4.2.0</version>
 	<description>Clustered and keyed generic object pools</description>
 	<url>https://github.com/bbottema/clustered-object-pool</url>
 	<inceptionYear>2019</inceptionYear>
 
 	<properties>
 		<automaticModuleName>org.bbottema.clusteredobjectpool</automaticModuleName>
-		<generic-object-pool.version>2.6.0-SNAPSHOT</generic-object-pool.version>
+		<generic-object-pool.version>2.6.0</generic-object-pool.version>
 		<license.owner.name>Benny Bottema</license.owner.name>
 		<license.owner.email>benny@bennybottema.com</license.owner.email>
 	</properties>

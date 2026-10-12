@@ -3,13 +3,14 @@ https://github.com/bbottema/clustered-object-pool
 
 RELEASE NOTES clustered-object-pool
 
-v4.3.0 (unreleased)
+v4.3.0 (12 October 2026)
 
 - #31: List the pools an application can consider with selectPoolCandidates(...), for example to consider another destination after a connection failure.
   The immutable list contains each captured registration once and uses the configured load-balancing strategy.
   Selection borrows no resource. Retirement does not substitute a new registration, and only the first selection advances the shared load-balancing position.
   Failure classification and retries remain the caller's responsibility; normal one-pool selection and claims are unchanged.
-- Uses generic-object-pool 2.6.0-SNAPSHOT for local verification. Java 8 and existing APIs remain supported. This version is not published yet.
+- #31: Continue an already-started acquisition with ResourcePoolSelection.claimWithContext(...), retaining claim identity, cancellation and elapsed budget.
+- Uses generic-object-pool 2.6.0. Java 8, existing APIs and JPMS module names remain supported.
 
 v4.2.0 (1 October 2026)
 
