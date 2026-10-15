@@ -27,6 +27,7 @@ final class ResourcePools<PoolKey, T> {
 	private volatile Collection<ResourcePool<PoolKey, T>> clusterCollection;
 	private final Map<PoolKey, ResourcePool<PoolKey, T>> pools = new LinkedHashMap<>();
 	private final Map<ResourcePool<PoolKey, T>, Future<Void>> poolsShuttingDown = new ConcurrentHashMap<>();
+	private boolean retired;
 
 	ResourcePools(final Collection<ResourcePool<PoolKey, T>> collection) {
 		this(() -> collection, new ReentrantLock());
@@ -167,6 +168,9 @@ final class ResourcePools<PoolKey, T> {
 			if (!ClaimBudget.active(context)) {
 				return null;
 			}
+			if (retired) {
+				throw new IllegalStateException("This cluster was removed; register the pool again through the cluster registry");
+			}
 			final ResourcePool<PoolKey, T> existing = pools.get(key);
 			if (existing != null && failIfExists) {
 				throw new IllegalArgumentException("Pool already exists for " + key);
@@ -237,6 +241,20 @@ final class ResourcePools<PoolKey, T> {
 
 	int trackedShuttingDownPoolCount() {
 		return poolsShuttingDown.size();
+	}
+
+	/** Fences callers that captured this registry before removal, without interfering with active pools or pending disposal. */
+	boolean retireIfEmpty() {
+		registryLock.lock();
+		try {
+			if (!pools.isEmpty() || !poolsShuttingDown.isEmpty()) {
+				return false;
+			}
+			retired = true;
+			return true;
+		} finally {
+			registryLock.unlock();
+		}
 	}
 
 	boolean containsPool(final PoolKey key) {

@@ -14,6 +14,7 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class ResourcePoolsShutdownTest {
 
@@ -43,6 +44,7 @@ class ResourcePoolsShutdownTest {
 		ResourcePools<String, Boolean> pools = new ResourcePools<>(new ArrayList<ResourcePool<String, Boolean>>());
 		pools.add(new ResourcePool<>("credential-generation", objectPool));
 		PoolableObject<Boolean> lease = pools.claimResource("credential-generation", new Timeout(1, TimeUnit.SECONDS));
+		assertThat(pools.retireIfEmpty()).isFalse();
 
 		try {
 			Future<Void> shutdown = pools.shutdownPool("credential-generation");
@@ -53,11 +55,16 @@ class ResourcePoolsShutdownTest {
 			lease.release();
 			assertThat(deallocationStarted.await(1, TimeUnit.SECONDS)).isTrue();
 			assertThat(shutdown.isDone()).isFalse();
+			assertThat(pools.retireIfEmpty()).isFalse();
 
 			allowDeallocationToFinish.countDown();
 			shutdown.get(1, TimeUnit.SECONDS);
 			aggregateShutdown.get(1, TimeUnit.SECONDS);
 			assertThat(pools.trackedShuttingDownPoolCount()).isZero();
+			assertThat(pools.retireIfEmpty()).isTrue();
+			assertThatThrownBy(() -> pools.register("late", () -> {
+				throw new AssertionError("Removed clusters must not create another pool");
+			}, true, null)).isInstanceOf(IllegalStateException.class).hasMessageContaining("removed");
 		} finally {
 			allowDeallocationToFinish.countDown();
 		}
