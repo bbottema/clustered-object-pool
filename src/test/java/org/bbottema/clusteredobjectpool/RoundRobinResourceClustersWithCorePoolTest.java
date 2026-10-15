@@ -1,12 +1,14 @@
 package org.bbottema.clusteredobjectpool;
 
 import org.bbottema.clusteredobjectpool.core.api.ResourceKey.ResourceClusterAndPoolKey;
+import org.bbottema.genericobjectpool.Allocator;
 import org.bbottema.genericobjectpool.ExpirationPolicy;
 import org.bbottema.genericobjectpool.PoolableObject;
 import org.bbottema.genericobjectpool.expirypolicies.TimeoutSinceCreationExpirationPolicy;
 import org.junit.jupiter.api.Test;
 
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import static java.util.Objects.requireNonNull;
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
@@ -19,10 +21,29 @@ public class RoundRobinResourceClustersWithCorePoolTest extends RoundRobinResour
 	private static final UUID keyCluster1 = UUID.randomUUID();
 	private static final UUID keyCluster2 = UUID.randomUUID();
 	private static final UUID keyCluster3 = UUID.randomUUID();
+	private final AtomicBoolean backgroundAllocationAllowed = new AtomicBoolean(true);
 	
 	public TestableDummyClustersDefaultAutoSizing createTestableClusters() {
 		final ExpirationPolicy<String> defaultExpiration = new TimeoutSinceCreationExpirationPolicy<>(10, SECONDS);
-		return new TestableDummyClustersDefaultAutoSizing(new DummyAllocatorFactory(), defaultExpiration);
+		return new TestableDummyClustersDefaultAutoSizing(key -> {
+			final Allocator<String> delegate = new DummyAllocatorFactory().create(key);
+			return new Allocator<String>() {
+				@Override
+				public boolean isBackgroundAllocationAllowed() {
+					return backgroundAllocationAllowed.get();
+				}
+
+				@Override
+				public String allocate() {
+					return delegate.allocate();
+				}
+
+				@Override
+				public void deallocate(final String object) {
+					delegate.deallocate(object);
+				}
+			};
+		}, defaultExpiration);
 	}
 	
 	@Test
@@ -34,6 +55,8 @@ public class RoundRobinResourceClustersWithCorePoolTest extends RoundRobinResour
 		clusters.registerResourcePool(new ResourceClusterAndPoolKey<>(keyCluster3, "server_E"));
 		// Exact FIFO resource identities below assume background core prefill has completed.
 		assertThat(waitUntilAllocated(20, 2000)).isTrue();
+		// Keep replacement creation out of the FIFO assertions: automatic top-up may otherwise enqueue A5 before recycled A4.
+		backgroundAllocationAllowed.set(false);
 		
 		// first claim on a few specific servers
 		PoolableObject<String> connectionA1 = clusters.claimResourceFromPool(new ResourceClusterAndPoolKey<>(keyCluster1, "server_A"));

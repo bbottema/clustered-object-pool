@@ -376,6 +376,35 @@ public class ResourceClusters<ClusterKey, PoolKey, T> {
 		return CompositeFuturesAsFutureTask.ofFutures(completions);
 	}
 
+	/**
+	 * Forgets an unused cluster and its settings, so a long-lived registry need not keep every cluster it has ever hosted.
+	 * First shut down its pools and await their shutdown futures; this method does not close resources or wait for disposal.
+	 * It returns false while a pool is still registered or shutting down, and true once the cluster has been removed
+	 * (including when it was already absent).
+	 * <p>
+	 * Ordinary shutdown still retains the cluster's configuration for reuse. Calling this method opts out of that retention:
+	 * a later registration with the same key starts a new cluster, using newly supplied settings or the registry defaults.
+	 * Earlier selections remain retired; a registration already targeting the removed cluster fails instead of silently
+	 * adding a pool to an unreachable registry. No allocator or load-balancing callbacks run during removal.
+	 *
+	 * @param key the cluster whose configuration is no longer needed
+	 * @return whether the cluster is now absent
+	 */
+	public boolean removeEmptyCluster(@NotNull final ClusterKey key) {
+		registryLock.lock();
+		try {
+			final ResourcePools<PoolKey, T> cluster = resourceClusters.get(key);
+			if (cluster != null && !cluster.retireIfEmpty()) {
+				return false;
+			}
+			resourceClusters.remove(key);
+			resourceClusterConfigs.remove(key);
+			return true;
+		} finally {
+			registryLock.unlock();
+		}
+	}
+
 	private AllocationContext startClaim(final ClusterKey key, final ClaimOptions options) throws InterruptedException {
 		final AllocationContext context = requireNonNull(options, "options").start();
 		if (!ClaimBudget.acquire(registryLock, context)) {

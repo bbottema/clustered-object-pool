@@ -129,6 +129,58 @@ class ResourcePoolSelectionTest {
 	}
 
 	@Test
+	void removalForgetsSettingsOnlyAfterTheLastPoolDrainsAndDoesNotReviveSelections() throws Exception {
+		final ResourceClusters<String, String, String> clusters = clusters(strategy());
+		final ClusterConfig<String, String, String> specific = ClusterConfig.<String, String, String>builder()
+				.allocatorFactory(key -> new Allocator<String>() {
+					@Override public String allocate() { return key.getPoolKey(); }
+				}).defaultMaxPoolSize(3).defaultExpirationPolicy(value -> false).build();
+		clusters.registerResourceCluster("cluster", specific);
+		register(clusters, "one", "two");
+		final ResourcePoolSelection<String, String> previous = clusters.selectPool(key("one"));
+		assertThat(clusters.removeEmptyCluster("cluster")).isFalse();
+		clusters.shutdownPool("one").get(5, SECONDS);
+		assertThat(clusters.removeEmptyCluster("cluster")).isFalse();
+		assertThat(clusters.getClusterConfig("cluster")).isSameAs(specific);
+		clusters.shutdownPool("two").get(5, SECONDS);
+		assertThat(clusters.isClusterRegistered("cluster")).isTrue(); // Shutdown alone keeps the established reusable-cluster contract.
+		assertThat(clusters.removeEmptyCluster("cluster")).isTrue();
+		assertThat(clusters.removeEmptyCluster("cluster")).isTrue();
+		assertThat(clusters.isClusterRegistered("cluster")).isFalse();
+		assertThat(clusters.getClusterConfig("cluster")).isSameAs(clusters.getClusterConfig());
+		register(clusters, "one");
+		assertThatThrownBy(previous::claim).isInstanceOf(IllegalStateException.class).hasMessageContaining("retired");
+		assertClaim(clusters.selectPool(key("one")), "one");
+	}
+
+	@Test
+	void registrationCapturedBeforeRemovalCannotCreateAnOrphanPool() throws Exception {
+		final CountDownLatch preparing = new CountDownLatch(1);
+		final CountDownLatch resume = new CountDownLatch(1);
+		final ResourceClusters<String, String, String> clusters = clusters(new RoundRobinLoadBalancing<ResourcePool<String, String>>() {
+			@Override
+			public Queue<ResourcePool<String, String>> createCollectionForCycling() {
+				preparing.countDown();
+				await(resume);
+				return super.createCollectionForCycling();
+			}
+		});
+		try {
+			final Future<?> registration = workers.submit(() -> register(clusters, "one"));
+			await(preparing);
+			assertThat(clusters.removeEmptyCluster("cluster")).isTrue();
+			resume.countDown();
+			assertThatThrownBy(() -> registration.get(5, SECONDS)).hasCauseInstanceOf(IllegalStateException.class);
+			assertThat(clusters.isClusterRegistered("cluster")).isFalse();
+			assertThat(allocations).hasValue(0);
+			register(clusters, "one");
+			assertClaim(clusters.selectPool(key("one")), "one");
+		} finally {
+			resume.countDown();
+		}
+	}
+
+	@Test
 	void cancellationBeforeSelectionOrClaimAllocatesNothing() throws Exception {
 		final ResourceClusters<String, String, String> clusters = clusters(strategy());
 		register(clusters, "one");

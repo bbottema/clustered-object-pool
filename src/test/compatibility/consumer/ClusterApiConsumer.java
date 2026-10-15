@@ -38,6 +38,9 @@ public final class ClusterApiConsumer {
 		} finally {
 			clusters.shutDown().get(5, TimeUnit.SECONDS);
 		}
+		if (!clusters.removeEmptyCluster("cluster") || clusters.isClusterRegistered("cluster")) {
+			throw new AssertionError("Retired cluster metadata was not removed");
+		}
 		System.out.println("Opt-in cluster acquisition API: OK");
 	}
 }

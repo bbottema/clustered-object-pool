@@ -3,6 +3,13 @@ https://github.com/bbottema/clustered-object-pool
 
 RELEASE NOTES clustered-object-pool
 
+v4.4.0 (15 October 2026)
+
+- #32: Allow long-lived registries to forget fully retired clusters and their settings with removeEmptyCluster(...).
+  Ordinary pool shutdown still preserves reusable cluster configuration. Active pools and unfinished disposal prevent removal.
+- A later registration starts afresh; earlier selections remain retired, and registrations targeting a removed cluster cannot create orphan pools.
+- Existing APIs, generic-object-pool 2.6.0, Java 8 and JPMS automatic module names remain supported.
+
 v4.3.0 (12 October 2026)
 
 - #31: List the pools an application can consider with selectPoolCandidates(...), for example to consider another destination after a connection failure.

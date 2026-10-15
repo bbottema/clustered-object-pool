@@ -1,6 +1,6 @@
 [![APACHE v2 License](https://img.shields.io/badge/license-apachev2-blue.svg?style=flat)](LICENSE-2.0.txt) 
 [![Latest Release](https://img.shields.io/maven-central/v/com.github.bbottema/clustered-object-pool.svg?style=flat)](http://search.maven.org/#search%7Cgav%7C1%7Cg%3A%22com.github.bbottema%22%20AND%20a%3A%22clustered-object-pool%22) 
-[![Javadocs](https://img.shields.io/badge/javadoc-4.3.0-brightgreen.svg?color=brightgreen)](https://www.javadoc.io/doc/com.github.bbottema/clustered-object-pool)
+[![Javadocs](https://img.shields.io/badge/javadoc-4.4.0-brightgreen.svg?color=brightgreen)](https://www.javadoc.io/doc/com.github.bbottema/clustered-object-pool)
 [![Codacy](https://img.shields.io/codacy/grade/7a0dc698534d4c9eb459709f7c3fbfe5.svg?style=flat)](https://www.codacy.com/app/b-bottema/clustered-object-pool)
 
 # clustered-object-pool
@@ -16,7 +16,7 @@ Maven Dependency Setup
 <dependency>
 	<groupId>com.github.bbottema</groupId>
 	<artifactId>clustered-object-pool</artifactId>
-	<version>4.3.0</version>
+	<version>4.4.0</version>
 </dependency>
 ```
 
@@ -24,6 +24,12 @@ For JPMS applications, the published JAR declares the stable automatic module na
 `org.bbottema.clusteredobjectpool`.
 
 ## Release Notes
+
+4.4.0 (15 October 2026)
+
+- [#32](https://github.com/bbottema/clustered-object-pool/issues/32): `removeEmptyCluster(...)` lets long-lived registries forget fully retired clusters and their settings. Await pool shutdown first; active pools and unfinished disposal prevent removal.
+- Ordinary pool shutdown still retains configuration for reuse. Explicit removal starts a fresh configuration on later registration and keeps earlier selections retired.
+- Existing APIs, Generic Object Pool 2.6.0, Java 8 and automatic module names remain supported.
 
 4.3.0 (12 October 2026)
 
@@ -269,6 +275,18 @@ Future<?> shutdownFuture = clusters.shutDown(PoolKey);
 
 shutdownFuture.get(); // blocks until all relevant pools have shut down
 ```
+
+Shutdown keeps empty clusters and their settings available for reuse. If your application creates many short-lived
+clusters, explicitly forget an unused cluster after its pools have finished shutting down:
+
+```java
+clusters.shutdownPool(poolKey).get();
+boolean removed = clusters.removeEmptyCluster(clusterKey);
+```
+
+`removeEmptyCluster` returns `false` if another pool is still registered or being disposed of; it never closes an active
+pool or waits for it. When it returns `true`, neither the cluster nor its settings remain in the registry. Registering the
+same cluster key later starts afresh; previously captured selections cannot borrow from that replacement.
 
 ## Selecting before claiming
 
