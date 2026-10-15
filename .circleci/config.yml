@@ -10,6 +10,7 @@ mvn-deploy-command: &mvn-deploy-command
   mvn-deploy-command:  |
     mvn -s .circleci/maven-central-settings.xml clean deploy -DperformRelease=true -DskipTests -Dspotbugs.skip=true -Denforcer.skip=true -Djacoco.skip=true
     mvn license:remove
+  deploy-no-output-timeout: 60m
   context: RELEASE_PROFILE_BBOTTEMA
 
 workflows:
