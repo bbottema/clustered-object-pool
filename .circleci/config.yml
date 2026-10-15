@@ -22,7 +22,7 @@ jobs:
           name: Read existing Central deployment status without publishing
           command: |
             set +x
-            python3 - <<'PY'
+            python3 - \<<'PY'
             import base64
             import json
             import os
