@@ -1,53 +1,60 @@
 version: 2.1
 
-orbs:
-  github-maven-deploy: github-maven-deploy/github-maven-deploy@1.3.2
+parameters:
+  central-status:
+    type: boolean
+    default: false
+  deployment-id:
+    type: string
+    default: ""
 
-mvn-build-test-command: &mvn-build-test-command
-  mvn-build-test-command: mvn verify -Dmaven.javadoc.skip=true -Djacoco.skip=true -Dlicense.skip=true
+jobs:
+  check-central-deployment:
+    parameters:
+      deployment-id:
+        type: string
+    docker:
+      - image: cimg/python:3.12
+    environment:
+      DEPLOYMENT_ID: << parameters.deployment-id >>
+    steps:
+      - run:
+          name: Read existing Central deployment status without publishing
+          command: |
+            set +x
+            python3 - <<'PY'
+            import base64
+            import json
+            import os
+            import urllib.error
+            import urllib.request
+            import uuid
 
-mvn-deploy-command: &mvn-deploy-command
-  mvn-deploy-command:  |
-    mvn -s .circleci/maven-central-settings.xml clean deploy -DperformRelease=true -DskipTests -Dspotbugs.skip=true -Denforcer.skip=true -Djacoco.skip=true
-    mvn license:remove
-  context: RELEASE_PROFILE_BBOTTEMA
+            deployment_id = str(uuid.UUID(os.environ["DEPLOYMENT_ID"]))
+            credentials = (os.environ["CENTRAL_USERNAME"] + ":" + os.environ["CENTRAL_PASSWORD"]).encode("utf-8")
+            authorization = "Bearer " + base64.b64encode(credentials).decode("ascii")
+            request = urllib.request.Request(
+                "https://central.sonatype.com/api/v1/publisher/status?id=" + deployment_id,
+                data=b"",
+                headers={"Authorization": authorization},
+                method="POST",
+            )
+            try:
+                with urllib.request.urlopen(request, timeout=45) as response:
+                    status = json.load(response)
+            except urllib.error.HTTPError as failure:
+                raise SystemExit("Central deployment-status request failed: HTTP " + str(failure.code))
+            print(json.dumps({
+                key: status[key]
+                for key in ("deploymentId", "deploymentState", "purls", "errors")
+                if key in status
+            }, sort_keys=True, indent=2))
+            PY
 
 workflows:
-  workflow:
+  central-status:
+    when: << pipeline.parameters.central-status >>
     jobs:
-      - github-maven-deploy/build-and-test:
-          <<: *mvn-build-test-command
-
-      - github-maven-deploy/approve-deploy-patch-version:
-          type: approval
-          requires:
-            - github-maven-deploy/build-and-test
-      - github-maven-deploy/approve-deploy-minor-version:
-          type: approval
-          requires:
-            - github-maven-deploy/build-and-test
-      - github-maven-deploy/approve-deploy-major-version:
-          type: approval
-          requires:
-            - github-maven-deploy/build-and-test
-      - github-maven-deploy/approve-deploy-as-is-version:
-          type: approval
-          requires:
-            - github-maven-deploy/build-and-test
-
-      - github-maven-deploy/deploy-patch-version:
-          requires:
-            - github-maven-deploy/approve-deploy-patch-version
-          <<: *mvn-deploy-command
-      - github-maven-deploy/deploy-minor-version:
-          requires:
-            - github-maven-deploy/approve-deploy-minor-version
-          <<: *mvn-deploy-command
-      - github-maven-deploy/deploy-major-version:
-          requires:
-            - github-maven-deploy/approve-deploy-major-version
-          <<: *mvn-deploy-command
-      - github-maven-deploy/deploy-as-is-version:
-          requires:
-            - github-maven-deploy/approve-deploy-as-is-version
-          <<: *mvn-deploy-command
+      - check-central-deployment:
+          context: RELEASE_PROFILE_BBOTTEMA
+          deployment-id: << pipeline.parameters.deployment-id >>
