@@ -177,6 +177,32 @@ CircleCI exposes these approval jobs:
 
 Approve exactly the authorized gate on the current `master` workflow. The deploy job owns the POM version update, commit, tag, and Maven Central publication. Do not edit `pom.xml` merely to prepare a release.
 
+The release job allows 60 minutes without console output through the orb's `deploy-no-output-timeout` setting. Central
+Portal may remain quiet while `waitUntil=published` waits for its publication service. A CircleCI timeout can therefore
+stop the client after its bundle was accepted; it does not establish that the remote deployment failed.
+
+### Recover an interrupted publication
+
+Before rerunning a release, find the existing deployment ID in the deploy log and read its authenticated status using the
+[Central Publisher API](https://central.sonatype.org/publish/publish-portal-api/#verify-status-of-the-deployment):
+`POST /api/v1/publisher/status?id=<deployment-id>`. Use the existing Central user token in memory or in the protected
+release context. Never print credentials, authorization headers or complete environment variables.
+
+If credentials are only available in CircleCI, a status-only job can use `CENTRAL_USERNAME` and `CENTRAL_PASSWORD` from
+`RELEASE_PROFILE_BBOTTEMA`, with no upload or publication command. The isolated `codex/central-deployment-status` branch
+provides this diagnostic workflow: trigger it with `central-status=true` and the existing UUID in `deployment-id`.
+Its output is restricted to the deployment ID, state, component coordinates and validation errors.
+
+- `PENDING`, `VALIDATING` or `PUBLISHING`: wait for that deployment. Do not upload another copy.
+- `VALIDATED`: inspect why automatic publication has not started before taking another action.
+- `FAILED`: inspect the reported validation errors before deciding whether a corrected upload is needed.
+- `PUBLISHED`: verify the JAR and POM from Maven Central, then repair only missing repository state.
+
+If publication succeeded but the interrupted job never pushed its version commit or numeric tag, compare the published
+sources and POM with the intended release commit first. Restore only the published POM version, create the ordinary
+`released <version> [skip ci]` commit and annotated numeric tag, and push them without running Maven deploy again.
+Do not move an existing tag or claim availability based only on the original upload succeeding.
+
 After deployment:
 
 1. Fetch `master` and tags.
